@@ -78,12 +78,12 @@ class TestAuthentication:
     async def test_protected_route_with_revoked_token(
         self,
         gateway_client: TestClient,
-        session_store: InMemorySessionStore,
+        gateway,
         test_session: SessionData,
     ):
         """Test accessing protected route with revoked session token."""
         # Revoke the session
-        await session_store.revoke(test_session.session_id)
+        await gateway.session_store.revoke(test_session.session_id)
 
         gateway_client.session.cookie_jar.update_cookies({"session_token": test_session.session_id})
 
@@ -226,7 +226,7 @@ class TestSessionLifecycle:
     async def test_session_refresh_near_expiration(
         self,
         gateway_client: TestClient,
-        session_store: InMemorySessionStore,
+        gateway,
     ):
         """Test session token refresh when approaching expiration."""
         # Create session that's near expiration
@@ -240,7 +240,7 @@ class TestSessionLifecycle:
             expires_at=now + timedelta(minutes=2),  # Expires soon
             roles=["user"],
         )
-        await session_store.create(near_expiration_session)
+        await gateway.session_store.create(near_expiration_session)
 
         gateway_client.session.cookie_jar.update_cookies(
             {"session_token": near_expiration_session.session_id}

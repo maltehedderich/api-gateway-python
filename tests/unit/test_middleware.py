@@ -164,7 +164,6 @@ class TestMiddlewareIntegration(AioHTTPTestCase):
 
         return app
 
-    @unittest_run_loop
     async def test_request_context_creation(self):
         """Test creating request context from real request."""
         async with self.client.get("/test") as resp:

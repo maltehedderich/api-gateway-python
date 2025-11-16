@@ -13,6 +13,7 @@ from aiohttp import web
 
 from gateway.core.config import GatewayConfig, RateLimitRule
 from gateway.core.middleware import Middleware, MiddlewareHandler, RequestContext
+from gateway.core.server import METRICS_KEY
 from gateway.core.rate_limit import (
     FixedWindowAlgorithm,
     RateLimitAlgorithm,
@@ -385,7 +386,7 @@ class RateLimitingMiddleware(Middleware):
                 self._add_rate_limit_headers(response, state)
 
                 # Update metrics if available
-                metrics = request.app.get("metrics")
+                metrics = request.app.get(METRICS_KEY)
                 if metrics:
                     metrics.record_rate_limit_exceeded(rule.name, rule.key_type)
 

@@ -18,6 +18,14 @@ from gateway.core.metrics import GatewayMetrics
 
 logger = logging.getLogger(__name__)
 
+# App keys for type-safe access (exported for use in middleware)
+CONFIG_KEY = web.AppKey("config", GatewayConfig)
+LOGGER_KEY = web.AppKey("logger", GatewayLogger)
+METRICS_KEY = web.AppKey("metrics", GatewayMetrics)
+
+# Export keys
+__all__ = ["HTTPServer", "CONFIG_KEY", "LOGGER_KEY", "METRICS_KEY"]
+
 
 class HTTPServer:
     """HTTP Server for the API Gateway.
@@ -63,9 +71,9 @@ class HTTPServer:
         )
 
         # Store references for access in handlers
-        app["config"] = self.config
-        app["logger"] = self.structured_logger
-        app["metrics"] = self.metrics
+        app[CONFIG_KEY] = self.config
+        app[LOGGER_KEY] = self.structured_logger
+        app[METRICS_KEY] = self.metrics
 
         # Setup lifecycle hooks
         app.on_startup.append(self._on_startup)

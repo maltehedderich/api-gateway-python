@@ -18,6 +18,7 @@ from typing import Any
 from aiohttp import web
 
 from gateway.core.config import GatewayConfig
+from gateway.core.server import CONFIG_KEY, LOGGER_KEY, METRICS_KEY
 from gateway.core.routing import RouteMatch
 
 logger = logging.getLogger(__name__)
@@ -221,7 +222,7 @@ class RequestLoggingMiddleware(Middleware):
             web.Response object
         """
         # Get structured logger from app
-        structured_logger = request.app.get("logger")
+        structured_logger = request.app.get(LOGGER_KEY)
 
         # Log request start
         if structured_logger:
@@ -262,7 +263,7 @@ class ResponseLoggingMiddleware(Middleware):
         response = await next_handler(request, context)
 
         # Get structured logger from app
-        structured_logger = request.app.get("logger")
+        structured_logger = request.app.get(LOGGER_KEY)
 
         # Log response with full context per design spec section 9.6 Task 28
         if structured_logger:
@@ -285,7 +286,7 @@ class ResponseLoggingMiddleware(Middleware):
             structured_logger.log_response(**log_params)
 
         # Update metrics
-        metrics = request.app.get("metrics")
+        metrics = request.app.get(METRICS_KEY)
         if metrics:
             metrics.record_request(
                 method=context.method,
@@ -361,7 +362,7 @@ def create_request_context(
     # Generate correlation ID if not provided
     if not correlation_id:
         # Check if client provided correlation ID
-        config = request.app.get("config")
+        config = request.app.get(CONFIG_KEY)
         if config:
             header_name = config.logging.correlation_id_header
             correlation_id = request.headers.get(header_name)
