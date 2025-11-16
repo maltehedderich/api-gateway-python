@@ -1,0 +1,75 @@
+# Production Environment Configuration
+
+environment: production
+
+server:
+  host: "0.0.0.0"
+  port: 443
+  tls_enabled: true
+  # TLS paths should be provided via environment variables in production:
+  # GATEWAY_SERVER_TLS_CERT_PATH
+  # GATEWAY_SERVER_TLS_KEY_PATH
+  connection_timeout: 30
+  keepalive_timeout: 60
+  max_connections: 10000
+
+logging:
+  level: "INFO"
+  format: "json"
+  output: "stdout"
+
+session:
+  cookie_name: "session_token"
+  # Session store URL should be provided via environment variable:
+  # GATEWAY_SESSION_STORE_URL
+  # Token signing secret MUST be provided via environment variable:
+  # GATEWAY_TOKEN_SIGNING_SECRET
+  token_ttl: 1800  # 30 minutes
+  refresh_enabled: true
+  refresh_threshold: 300
+
+rate_limiting:
+  enabled: true
+  # Rate limit store URL should be provided via environment variable:
+  # GATEWAY_RATELIMIT_STORE_URL
+  fail_mode: "closed"  # Fail-closed in production for security
+  rules:
+    - name: "global_strict"
+      key_type: "ip"
+      algorithm: "token_bucket"
+      limit: 100
+      window: 60
+      burst: 120
+
+    - name: "authenticated_user"
+      key_type: "user"
+      algorithm: "token_bucket"
+      limit: 500
+      window: 60
+      burst: 600
+
+    - name: "sensitive_endpoints"
+      key_type: "composite"
+      algorithm: "sliding_window"
+      limit: 10
+      window: 60
+      routes:
+        - "/api/v1/admin"
+        - "/api/v1/payment"
+
+upstream:
+  connection_timeout: 5
+  request_timeout: 30
+  pool_size: 500
+  retry_enabled: true
+  retry_attempts: 2
+
+metrics:
+  enabled: true
+  endpoint: "/metrics"
+  health_endpoint: "/health"
+  liveness_endpoint: "/health/live"
+  readiness_endpoint: "/health/ready"
+
+# Routes should be configured per deployment
+routes: []
