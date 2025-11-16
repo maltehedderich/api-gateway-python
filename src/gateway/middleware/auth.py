@@ -145,9 +145,7 @@ class TokenValidator:
 
             # Verify signature
             expected_signature = hmac.new(
-                self.signing_secret.encode(),
-                payload_b64.encode(),
-                hashlib.sha256
+                self.signing_secret.encode(), payload_b64.encode(), hashlib.sha256
             ).hexdigest()
 
             if not hmac.compare_digest(signature_b64, expected_signature):
@@ -156,6 +154,7 @@ class TokenValidator:
 
             # Decode payload
             import base64
+
             payload_json = base64.b64decode(payload_b64).decode()
             payload = json.loads(payload_json)
 
@@ -247,7 +246,9 @@ class TokenValidator:
                 session_id=payload.get("session_id", ""),
                 user_id=payload.get("user_id", ""),
                 username=payload.get("username", ""),
-                created_at=datetime.fromisoformat(payload.get("iat", datetime.utcnow().isoformat())),
+                created_at=datetime.fromisoformat(
+                    payload.get("iat", datetime.utcnow().isoformat())
+                ),
                 last_accessed_at=datetime.utcnow(),
                 expires_at=exp_dt,
                 revoked=False,
@@ -383,9 +384,7 @@ class TokenRefresher:
 
         # Generate signature
         signature = hmac.new(
-            self.signing_secret.encode(),
-            payload_b64.encode(),
-            hashlib.sha256
+            self.signing_secret.encode(), payload_b64.encode(), hashlib.sha256
         ).hexdigest()
 
         # Combine into token
@@ -453,13 +452,17 @@ class AuthenticationMiddleware(Middleware):
             use_signed_tokens=use_signed_tokens,
         )
 
-        self.refresher = TokenRefresher(
-            session_store=session_store,
-            refresh_threshold=config.session.refresh_threshold,
-            token_ttl=config.session.token_ttl,
-            signing_secret=config.session.token_signing_secret,
-            use_signed_tokens=use_signed_tokens,
-        ) if config.session.refresh_enabled else None
+        self.refresher = (
+            TokenRefresher(
+                session_store=session_store,
+                refresh_threshold=config.session.refresh_threshold,
+                token_ttl=config.session.token_ttl,
+                signing_secret=config.session.token_signing_secret,
+                use_signed_tokens=use_signed_tokens,
+            )
+            if config.session.refresh_enabled
+            else None
+        )
 
         self.authorizer = Authorizer()
 
@@ -496,7 +499,7 @@ class AuthenticationMiddleware(Middleware):
                 extra={
                     "correlation_id": context.correlation_id,
                     "path": context.path,
-                }
+                },
             )
             return web.json_response(
                 {
@@ -517,7 +520,7 @@ class AuthenticationMiddleware(Middleware):
                 extra={
                     "correlation_id": context.correlation_id,
                     "path": context.path,
-                }
+                },
             )
             return web.json_response(
                 {
@@ -545,7 +548,7 @@ class AuthenticationMiddleware(Middleware):
                     "user_id": session_data.user_id,
                     "required_roles": route.auth_roles,
                     "user_roles": session_data.roles,
-                }
+                },
             )
             return web.json_response(
                 {

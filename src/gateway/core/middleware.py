@@ -150,6 +150,7 @@ class MiddlewareChain:
         Returns:
             web.Response object
         """
+
         # Build the chain from the end
         async def build_handler(index: int) -> MiddlewareHandler:
             """Build handler at given index.
@@ -328,7 +329,9 @@ class ErrorHandlingMiddleware(Middleware):
             )
 
 
-def create_request_context(request: web.Request, correlation_id: Optional[str] = None) -> RequestContext:
+def create_request_context(
+    request: web.Request, correlation_id: Optional[str] = None
+) -> RequestContext:
     """Create a request context from an aiohttp request.
 
     Args:

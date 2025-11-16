@@ -7,13 +7,7 @@ import time
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
-from prometheus_client import (
-    REGISTRY,
-    Counter,
-    Gauge,
-    Histogram,
-    generate_latest,
-)
+from prometheus_client import REGISTRY, Counter, Gauge, Histogram, generate_latest
 
 from gateway.core.config import MetricsConfig
 
@@ -196,9 +190,7 @@ class GatewayMetrics:
             method=method, path=normalized_path, status=str(status_code)
         ).inc()
 
-        self.request_duration.labels(method=method, path=normalized_path).observe(
-            duration_seconds
-        )
+        self.request_duration.labels(method=method, path=normalized_path).observe(duration_seconds)
 
         if request_size is not None:
             self.request_size.labels(method=method, path=normalized_path).observe(request_size)
@@ -283,9 +275,7 @@ class GatewayMetrics:
         """Decrement active connection count."""
         self.active_connections.dec()
 
-    def register_health_check(
-        self, name: str, check_func: Callable[[], ComponentHealth]
-    ) -> None:
+    def register_health_check(self, name: str, check_func: Callable[[], ComponentHealth]) -> None:
         """Register a health check function.
 
         Args:
@@ -320,7 +310,10 @@ class GatewayMetrics:
                 # Determine overall status
                 if result.status == HealthStatus.UNHEALTHY:
                     overall_status = HealthStatus.UNHEALTHY
-                elif result.status == HealthStatus.DEGRADED and overall_status == HealthStatus.HEALTHY:
+                elif (
+                    result.status == HealthStatus.DEGRADED
+                    and overall_status == HealthStatus.HEALTHY
+                ):
                     overall_status = HealthStatus.DEGRADED
 
             except Exception as e:

@@ -66,8 +66,7 @@ class Gateway:
             SessionStore instance
         """
         return RedisSessionStore(
-            redis_url=self.config.session.session_store_url,
-            key_prefix="session:"
+            redis_url=self.config.session.session_store_url, key_prefix="session:"
         )
 
     def _create_middleware_chain(self) -> MiddlewareChain:
@@ -163,8 +162,7 @@ class Gateway:
 
         if not session_store_ready:
             return web.json_response(
-                {"status": "not_ready", "reason": "session_store_unavailable"},
-                status=503
+                {"status": "not_ready", "reason": "session_store_unavailable"}, status=503
             )
 
         return web.json_response({"status": "ready"}, status=200)

@@ -127,7 +127,9 @@ def test_config_loader_missing_file() -> None:
     assert config.environment == "development"
 
 
-def test_config_loader_env_override(temp_config_file: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_config_loader_env_override(
+    temp_config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test ConfigLoader overrides from environment variables."""
     # Set environment variables
     monkeypatch.setenv("GATEWAY_SERVER_PORT", "7777")

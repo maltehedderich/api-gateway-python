@@ -224,9 +224,7 @@ def test_log_response(gateway_logger: GatewayLogger, caplog: pytest.LogCaptureFi
 def test_log_auth_event(gateway_logger: GatewayLogger, caplog: pytest.LogCaptureFixture) -> None:
     """Test authentication event logging."""
     with caplog.at_level(logging.INFO):
-        gateway_logger.log_auth_event(
-            event="auth_success", user_id="user-123", success=True
-        )
+        gateway_logger.log_auth_event(event="auth_success", user_id="user-123", success=True)
 
     assert len(caplog.records) == 1
     assert caplog.records[0].levelname == "INFO"

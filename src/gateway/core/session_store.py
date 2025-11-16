@@ -210,9 +210,7 @@ class RedisSessionStore(SessionStore):
         """Connect to Redis."""
         if self.client is None:
             self.client = await redis.from_url(
-                self.redis_url,
-                encoding="utf-8",
-                decode_responses=True
+                self.redis_url, encoding="utf-8", decode_responses=True
             )
             logger.info(f"Connected to Redis session store at {self.redis_url}")
 
@@ -287,7 +285,9 @@ class RedisSessionStore(SessionStore):
             await self.client.sadd(user_sessions_key, session_data.session_id)
             await self.client.expire(user_sessions_key, ttl)
 
-            logger.debug(f"Created session {session_data.session_id} for user {session_data.user_id}")
+            logger.debug(
+                f"Created session {session_data.session_id} for user {session_data.user_id}"
+            )
             return True
 
         except Exception as e:

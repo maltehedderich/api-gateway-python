@@ -23,12 +23,8 @@ class ServerConfig(BaseModel):
     tls_cert_path: Optional[str] = Field(default=None, description="Path to TLS certificate")
     tls_key_path: Optional[str] = Field(default=None, description="Path to TLS private key")
     connection_timeout: int = Field(default=60, ge=1, description="Connection timeout in seconds")
-    keepalive_timeout: int = Field(
-        default=75, ge=1, description="Keep-alive timeout in seconds"
-    )
-    max_connections: int = Field(
-        default=1000, ge=1, description="Maximum concurrent connections"
-    )
+    keepalive_timeout: int = Field(default=75, ge=1, description="Keep-alive timeout in seconds")
+    max_connections: int = Field(default=1000, ge=1, description="Maximum concurrent connections")
 
     @field_validator("tls_cert_path", "tls_key_path")
     @classmethod
@@ -90,18 +86,14 @@ class SessionConfig(BaseModel):
     )
     token_ttl: int = Field(default=3600, ge=60, description="Token TTL in seconds")
     refresh_enabled: bool = Field(default=True, description="Enable token refresh")
-    refresh_threshold: int = Field(
-        default=300, ge=0, description="Refresh threshold in seconds"
-    )
+    refresh_threshold: int = Field(default=300, ge=0, description="Refresh threshold in seconds")
 
 
 class RateLimitRule(BaseModel):
     """Rate limiting rule configuration."""
 
     name: str = Field(description="Rule name")
-    key_type: str = Field(
-        default="user", description="Key type (ip, user, route, composite)"
-    )
+    key_type: str = Field(default="user", description="Key type (ip, user, route, composite)")
     algorithm: str = Field(default="token_bucket", description="Rate limiting algorithm")
     limit: int = Field(ge=1, description="Request limit")
     window: int = Field(ge=1, description="Time window in seconds")
@@ -168,9 +160,7 @@ class MetricsConfig(BaseModel):
     endpoint: str = Field(default="/metrics", description="Metrics endpoint path")
     health_endpoint: str = Field(default="/health", description="Health check endpoint path")
     liveness_endpoint: str = Field(default="/health/live", description="Liveness endpoint path")
-    readiness_endpoint: str = Field(
-        default="/health/ready", description="Readiness endpoint path"
-    )
+    readiness_endpoint: str = Field(default="/health/ready", description="Readiness endpoint path")
 
 
 class GatewayConfig(BaseModel):
