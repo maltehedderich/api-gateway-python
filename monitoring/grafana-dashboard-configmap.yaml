@@ -1,0 +1,41 @@
+---
+# ConfigMap for Grafana dashboard
+# This allows the dashboard to be automatically loaded into Grafana when using Grafana sidecar
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-dashboard
+  namespace: monitoring  # or wherever Grafana is deployed
+  labels:
+    grafana_dashboard: "1"  # Label used by Grafana sidecar to discover dashboards
+    app: api-gateway
+data:
+  api-gateway-dashboard.json: |
+    {
+      "dashboard": {
+        "title": "API Gateway - Operations Dashboard",
+        "tags": ["api-gateway", "monitoring"],
+        "timezone": "browser",
+        "schemaVersion": 16,
+        "version": 1,
+        "refresh": "30s",
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "panels": [
+          {
+            "id": 1,
+            "title": "Request Rate (req/s)",
+            "type": "graph",
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total{job=\"api-gateway\"}[5m]))",
+                "legendFormat": "Total Requests"
+              }
+            ]
+          }
+        ]
+      }
+    }

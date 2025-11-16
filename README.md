@@ -108,9 +108,110 @@ See `config/` directory for example configurations.
 
 ## Running the Gateway
 
+### Local Development
+
 ```bash
-poetry run python -m gateway.main
+# With Poetry
+poetry run python -m gateway
+
+# Or using Make
+make run-local
+
+# With Docker
+make docker-build
+make docker-run
 ```
+
+### Using Docker Compose
+
+```bash
+docker-compose up -d
+```
+
+## Deployment
+
+### Kubernetes Deployment
+
+The gateway is designed for production deployment on Kubernetes with comprehensive monitoring and auto-scaling.
+
+**Quick Deploy:**
+
+```bash
+# Using Make (recommended)
+make deploy-all
+
+# Or manually
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/deployment.yaml
+kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/ingress.yaml
+```
+
+**Prerequisites:**
+- Kubernetes cluster (1.24+)
+- Redis instance
+- kubectl configured
+
+**Documentation:**
+- [Deployment Guide](docs/DEPLOYMENT.md) - Complete deployment instructions
+- [Operational Runbook](docs/RUNBOOK.md) - Day-to-day operations and troubleshooting
+- [Kubernetes README](k8s/README.md) - Kubernetes manifests documentation
+
+### Monitoring and Observability
+
+The gateway exposes Prometheus metrics and includes:
+- Pre-configured Grafana dashboards
+- Alerting rules for critical issues
+- Health check endpoints
+- Structured JSON logging
+
+**Metrics endpoint:** `http://localhost:9090/metrics`
+
+**Health checks:**
+- Liveness: `/health/live`
+- Readiness: `/health/ready`
+- Detailed: `/health`
+
+## Available Make Commands
+
+Run `make help` to see all available commands:
+
+```bash
+make help              # Show all available commands
+make install           # Install dependencies
+make test              # Run tests
+make lint              # Run linters
+make docker-build      # Build Docker image
+make deploy-all        # Deploy to Kubernetes
+make k8s-status        # Check deployment status
+```
+
+## Design and Architecture
+
+For detailed information about the architecture, components, and design decisions, see the [API Gateway Design Specification](API_GATEWAY_DESIGN_SPEC.md).
+
+Key features:
+- Middleware-based request processing pipeline
+- Pluggable authentication and authorization
+- Flexible rate limiting with multiple algorithms
+- Connection pooling for upstream services
+- Horizontal scaling with stateless design
+- Comprehensive error handling and logging
+
+## Performance
+
+- **Throughput**: Designed to handle 10,000+ requests/second per instance
+- **Latency**: p95 < 50ms (excluding upstream latency)
+- **Availability**: 99.9% SLA with proper deployment
+- **Auto-scaling**: HorizontalPodAutoscaler for automatic scaling
+
+## Contributing
+
+1. Ensure all tests pass: `make test`
+2. Run linters and formatters: `make lint format`
+3. Update documentation as needed
+4. Follow the existing code style
 
 ## License
 

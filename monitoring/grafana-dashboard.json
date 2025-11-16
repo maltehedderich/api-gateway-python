@@ -1,0 +1,235 @@
+{
+  "dashboard": {
+    "title": "API Gateway - Operations Dashboard",
+    "tags": ["api-gateway", "monitoring"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate (req/s)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{job=\"api-gateway\"}[5m]))",
+            "legendFormat": "Total Requests"
+          },
+          {
+            "expr": "sum(rate(http_requests_total{job=\"api-gateway\", status=~\"2..\"}[5m]))",
+            "legendFormat": "2xx Success"
+          },
+          {
+            "expr": "sum(rate(http_requests_total{job=\"api-gateway\", status=~\"4..\"}[5m]))",
+            "legendFormat": "4xx Client Error"
+          },
+          {
+            "expr": "sum(rate(http_requests_total{job=\"api-gateway\", status=~\"5..\"}[5m]))",
+            "legendFormat": "5xx Server Error"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Error Rate (%)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "(sum(rate(http_requests_total{job=\"api-gateway\", status=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"api-gateway\"}[5m]))) * 100",
+            "legendFormat": "5xx Error Rate"
+          },
+          {
+            "expr": "(sum(rate(http_requests_total{job=\"api-gateway\", status=~\"4..\"}[5m])) / sum(rate(http_requests_total{job=\"api-gateway\"}[5m]))) * 100",
+            "legendFormat": "4xx Error Rate"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "min": 0}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Latency (p50, p95, p99)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{job=\"api-gateway\"}[5m])) by (le))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"api-gateway\"}[5m])) by (le))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"api-gateway\"}[5m])) by (le))",
+            "legendFormat": "p99"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "min": 0}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Rate Limiting",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(rate_limit_exceeded_total{job=\"api-gateway\"}[5m]))",
+            "legendFormat": "Rate Limited Requests"
+          },
+          {
+            "expr": "(sum(rate(rate_limit_exceeded_total{job=\"api-gateway\"}[5m])) / sum(rate(http_requests_total{job=\"api-gateway\"}[5m]))) * 100",
+            "legendFormat": "Rate Limit Hit Rate (%)"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Authentication",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "sum(rate(auth_attempts_total{job=\"api-gateway\"}[5m]))",
+            "legendFormat": "Auth Attempts"
+          },
+          {
+            "expr": "sum(rate(auth_failures_total{job=\"api-gateway\"}[5m]))",
+            "legendFormat": "Auth Failures"
+          },
+          {
+            "expr": "(sum(rate(auth_failures_total{job=\"api-gateway\"}[5m])) / sum(rate(auth_attempts_total{job=\"api-gateway\"}[5m]))) * 100",
+            "legendFormat": "Failure Rate (%)"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Upstream Latency by Service",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(upstream_request_duration_seconds_bucket{job=\"api-gateway\"}[5m])) by (le, upstream))",
+            "legendFormat": "{{upstream}} p95"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "min": 0}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Active Connections",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "sum(active_connections{job=\"api-gateway\"}) by (pod)",
+            "legendFormat": "{{pod}}"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "CPU Usage",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 24},
+        "targets": [
+          {
+            "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"api-gateway\", pod=~\"api-gateway-.*\"}[5m])) by (pod) * 100",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "percent", "min": 0, "max": 100}
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Memory Usage",
+        "type": "graph",
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 24},
+        "targets": [
+          {
+            "expr": "sum(container_memory_working_set_bytes{namespace=\"api-gateway\", pod=~\"api-gateway-.*\"}) by (pod) / 1024 / 1024",
+            "legendFormat": "{{pod}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "megabytes", "min": 0}
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Requests by Route",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 30},
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{job=\"api-gateway\"}[5m])) by (route)",
+            "legendFormat": "{{route}}"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Requests by Method",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 30},
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{job=\"api-gateway\"}[5m])) by (method)",
+            "legendFormat": "{{method}}"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Status Codes Distribution",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 30},
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{job=\"api-gateway\"}[5m])) by (status)",
+            "legendFormat": "{{status}}"
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Upstream Error Rate by Service",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 38},
+        "targets": [
+          {
+            "expr": "sum(rate(upstream_request_errors_total{job=\"api-gateway\"}[5m])) by (upstream, error_type)",
+            "legendFormat": "{{upstream}} - {{error_type}}"
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Pod Restarts",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 38},
+        "targets": [
+          {
+            "expr": "sum(kube_pod_container_status_restarts_total{namespace=\"api-gateway\", pod=~\"api-gateway-.*\"}) by (pod)",
+            "legendFormat": "{{pod}}"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  # Redis for session storage and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: api-gateway-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - gateway-network
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"  # HTTP port
+      - "9090:9090"  # Metrics port
+    environment:
+      # Gateway configuration
+      - GATEWAY_ENV=development
+      - GATEWAY_LOG_LEVEL=DEBUG
+      - GATEWAY_HOST=0.0.0.0
+      - GATEWAY_PORT=8080
+      - GATEWAY_METRICS_PORT=9090
+
+      # Redis configuration
+      - REDIS_URL=redis://redis:6379/0
+
+      # Session configuration
+      - SESSION_SECRET=${SESSION_SECRET:-development-secret-change-in-production}
+
+    volumes:
+      # Mount configuration directory
+      - ./config:/app/config:ro
+
+      # Optional: Mount source code for development (uncomment for live reload)
+      # - ./src:/app/src:ro
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/live').read()"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+    networks:
+      - gateway-network
+
+    restart: unless-stopped
+
+  # Mock upstream service for testing (optional)
+  mock-service:
+    image: mendhak/http-https-echo:26
+    container_name: mock-upstream-service
+    ports:
+      - "8081:8080"
+    environment:
+      - HTTP_PORT=8080
+    networks:
+      - gateway-network
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  gateway-network:
+    driver: bridge

@@ -1,0 +1,82 @@
+---
+# ClusterIP Service for gateway (internal access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: api-gateway
+  labels:
+    app: api-gateway
+    component: gateway
+spec:
+  type: ClusterIP
+  selector:
+    app: api-gateway
+    component: gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: http
+      protocol: TCP
+  sessionAffinity: None
+---
+# Service for metrics (Prometheus scraping)
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-metrics
+  namespace: api-gateway
+  labels:
+    app: api-gateway
+    component: gateway
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app: api-gateway
+    component: gateway
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+---
+# LoadBalancer Service (for external access - optional, use Ingress instead for production)
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-lb
+  namespace: api-gateway
+  labels:
+    app: api-gateway
+    component: gateway
+  annotations:
+    # Cloud-specific annotations can be added here
+    # For AWS:
+    # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    # service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    # For GCP:
+    # cloud.google.com/load-balancer-type: "Internal"
+spec:
+  type: LoadBalancer
+  selector:
+    app: api-gateway
+    component: gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: http
+      protocol: TCP
+  sessionAffinity: None
+  externalTrafficPolicy: Local  # Preserve source IP

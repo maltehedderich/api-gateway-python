@@ -1,0 +1,134 @@
+---
+# ConfigMap for gateway configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: api-gateway
+  labels:
+    app: api-gateway
+    component: config
+data:
+  # Log level
+  log_level: "INFO"
+
+  # Gateway configuration file
+  gateway_config: |
+    server:
+      host: "0.0.0.0"
+      port: 8080
+      tls:
+        enabled: false
+        cert_path: "/app/certs/tls.crt"
+        key_path: "/app/certs/tls.key"
+      max_connections: 10000
+      timeout:
+        connection: 10
+        keep_alive: 60
+
+    logging:
+      level: "INFO"
+      format: "json"
+      output: "stdout"
+      redact_fields:
+        - "authorization"
+        - "cookie"
+        - "password"
+        - "token"
+        - "secret"
+
+    metrics:
+      enabled: true
+      port: 9090
+      path: "/metrics"
+
+    health:
+      liveness_path: "/health/live"
+      readiness_path: "/health/ready"
+      detail_path: "/health"
+
+    # Routes configuration
+    routes:
+      - id: "user-service"
+        path: "/api/v1/users/*"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        upstream: "http://user-service.default.svc.cluster.local:8080"
+        auth_required: true
+        rate_limit:
+          enabled: true
+          limit: 100
+          window: 60
+          key_strategy: "user+route"
+
+      - id: "product-service"
+        path: "/api/v1/products/*"
+        methods: ["GET", "POST", "PUT", "DELETE"]
+        upstream: "http://product-service.default.svc.cluster.local:8080"
+        auth_required: true
+        rate_limit:
+          enabled: true
+          limit: 200
+          window: 60
+          key_strategy: "user+route"
+
+      - id: "public-api"
+        path: "/api/v1/public/*"
+        methods: ["GET"]
+        upstream: "http://public-service.default.svc.cluster.local:8080"
+        auth_required: false
+        rate_limit:
+          enabled: true
+          limit: 50
+          window: 60
+          key_strategy: "ip"
+
+      - id: "health-check"
+        path: "/health/*"
+        methods: ["GET"]
+        upstream: "internal"
+        auth_required: false
+        rate_limit:
+          enabled: false
+
+    # Authentication configuration
+    authentication:
+      session_cookie_name: "session_token"
+      token_type: "opaque"  # or "signed"
+      token_expiration: 3600  # 1 hour
+      refresh_enabled: true
+      refresh_window: 300  # 5 minutes before expiration
+      ip_binding: false
+
+    # Authorization configuration
+    authorization:
+      default_deny: true
+      roles:
+        - name: "admin"
+          permissions: ["*"]
+        - name: "user"
+          permissions: ["read:*", "write:own"]
+        - name: "guest"
+          permissions: ["read:public"]
+
+    # Rate limiting configuration
+    rate_limiting:
+      algorithm: "token_bucket"  # or "sliding_window", "fixed_window"
+      fail_mode: "closed"  # or "open"
+      global_limit:
+        enabled: true
+        limit: 10000
+        window: 60
+        key_strategy: "global"
+
+    # Upstream proxy configuration
+    upstream:
+      timeout:
+        connection: 5
+        request: 30
+      retry:
+        enabled: false
+        max_attempts: 3
+        backoff: "exponential"
+      connection_pool:
+        max_size: 100
+        keep_alive: 60

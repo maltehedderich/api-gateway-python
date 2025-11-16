@@ -1,0 +1,251 @@
+---
+# PrometheusRule for alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: api-gateway-alerts
+  namespace: api-gateway
+  labels:
+    app: api-gateway
+    component: monitoring
+    prometheus: kube-prometheus
+spec:
+  groups:
+    # Availability and Health Alerts
+    - name: api-gateway-availability
+      interval: 30s
+      rules:
+        - alert: APIGatewayDown
+          expr: up{job="api-gateway"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            component: api-gateway
+          annotations:
+            summary: "API Gateway is down"
+            description: "API Gateway instance {{ $labels.pod }} has been down for more than 1 minute."
+
+        - alert: APIGatewayHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{status=~"5..", job="api-gateway"}[5m]))
+              /
+              sum(rate(http_requests_total{job="api-gateway"}[5m]))
+            ) * 100 > 5
+          for: 5m
+          labels:
+            severity: warning
+            component: api-gateway
+          annotations:
+            summary: "High error rate detected"
+            description: "API Gateway has error rate above 5% (current: {{ $value | humanize }}%)"
+
+        - alert: APIGatewayCriticalErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{status=~"5..", job="api-gateway"}[5m]))
+              /
+              sum(rate(http_requests_total{job="api-gateway"}[5m]))
+            ) * 100 > 10
+          for: 2m
+          labels:
+            severity: critical
+            component: api-gateway
+          annotations:
+            summary: "Critical error rate detected"
+            description: "API Gateway has error rate above 10% (current: {{ $value | humanize }}%)"
+
+    # Performance Alerts
+    - name: api-gateway-performance
+      interval: 30s
+      rules:
+        - alert: APIGatewayHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(http_request_duration_seconds_bucket{job="api-gateway"}[5m])) by (le)
+            ) > 1.0
+          for: 5m
+          labels:
+            severity: warning
+            component: api-gateway
+          annotations:
+            summary: "High latency detected"
+            description: "API Gateway p95 latency is above 1 second (current: {{ $value | humanize }}s)"
+
+        - alert: APIGatewayCriticalLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(http_request_duration_seconds_bucket{job="api-gateway"}[5m])) by (le)
+            ) > 3.0
+          for: 2m
+          labels:
+            severity: critical
+            component: api-gateway
+          annotations:
+            summary: "Critical latency detected"
+            description: "API Gateway p95 latency is above 3 seconds (current: {{ $value | humanize }}s)"
+
+        - alert: APIGatewaySlowUpstream
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(upstream_request_duration_seconds_bucket{job="api-gateway"}[5m])) by (le, upstream)
+            ) > 2.0
+          for: 5m
+          labels:
+            severity: warning
+            component: api-gateway
+          annotations:
+            summary: "Slow upstream service detected"
+            description: "Upstream {{ $labels.upstream }} has p95 latency above 2 seconds (current: {{ $value | humanize }}s)"
+
+    # Rate Limiting Alerts
+    - name: api-gateway-rate-limiting
+      interval: 30s
+      rules:
+        - alert: APIGatewayHighRateLimitHitRate
+          expr: |
+            (
+              sum(rate(rate_limit_exceeded_total{job="api-gateway"}[5m]))
+              /
+              sum(rate(http_requests_total{job="api-gateway"}[5m]))
+            ) * 100 > 10
+          for: 5m
+          labels:
+            severity: warning
+            component: api-gateway
+          annotations:
+            summary: "High rate limit hit rate"
+            description: "More than 10% of requests are being rate limited (current: {{ $value | humanize }}%)"
+
+        - alert: APIGatewayRateLimitSpike
+          expr: |
+            rate(rate_limit_exceeded_total{job="api-gateway"}[1m])
+            >
+            4 * rate(rate_limit_exceeded_total{job="api-gateway"}[1h] offset 1h)
+          for: 2m
+          labels:
+            severity: warning
+            component: api-gateway
+          annotations:
+            summary: "Rate limit spike detected"
+            description: "Rate limiting events have spiked significantly on {{ $labels.pod }}"
+
+    # Authentication and Authorization Alerts
+    - name: api-gateway-auth
+      interval: 30s
+      rules:
+        - alert: APIGatewayHighAuthFailureRate
+          expr: |
+            (
+              sum(rate(auth_failures_total{job="api-gateway"}[5m]))
+              /
+              sum(rate(auth_attempts_total{job="api-gateway"}[5m]))
+            ) * 100 > 20
+          for: 5m
+          labels:
+            severity: warning
+            component: api-gateway
+          annotations:
+            summary: "High authentication failure rate"
+            description: "More than 20% of authentication attempts are failing (current: {{ $value | humanize }}%)"
+
+        - alert: APIGatewayAuthFailureSpike
+          expr: |
+            rate(auth_failures_total{job="api-gateway"}[1m])
+            >
+            4 * rate(auth_failures_total{job="api-gateway"}[1h] offset 1h)
+          for: 2m
+          labels:
+            severity: warning
+            component: api-gateway
+          annotations:
+            summary: "Authentication failure spike detected"
+            description: "Authentication failures have spiked significantly - possible attack or service issue"
+
+    # Resource Utilization Alerts
+    - name: api-gateway-resources
+      interval: 30s
+      rules:
+        - alert: APIGatewayHighCPU
+          expr: |
+            sum(rate(container_cpu_usage_seconds_total{namespace="api-gateway", pod=~"api-gateway-.*"}[5m])) by (pod)
+            /
+            sum(container_spec_cpu_quota{namespace="api-gateway", pod=~"api-gateway-.*"} / container_spec_cpu_period{namespace="api-gateway", pod=~"api-gateway-.*"}) by (pod)
+            * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+            component: api-gateway
+          annotations:
+            summary: "High CPU usage"
+            description: "Pod {{ $labels.pod }} is using more than 80% CPU (current: {{ $value | humanize }}%)"
+
+        - alert: APIGatewayHighMemory
+          expr: |
+            sum(container_memory_working_set_bytes{namespace="api-gateway", pod=~"api-gateway-.*"}) by (pod)
+            /
+            sum(container_spec_memory_limit_bytes{namespace="api-gateway", pod=~"api-gateway-.*"}) by (pod)
+            * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+            component: api-gateway
+          annotations:
+            summary: "High memory usage"
+            description: "Pod {{ $labels.pod }} is using more than 80% memory (current: {{ $value | humanize }}%)"
+
+        - alert: APIGatewayPodRestartingOften
+          expr: |
+            rate(kube_pod_container_status_restarts_total{namespace="api-gateway", pod=~"api-gateway-.*"}[15m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            component: api-gateway
+          annotations:
+            summary: "Pod restarting frequently"
+            description: "Pod {{ $labels.pod }} is restarting frequently"
+
+    # Dependency Alerts
+    - name: api-gateway-dependencies
+      interval: 30s
+      rules:
+        - alert: APIGatewayRedisUnavailable
+          expr: redis_up{job="api-gateway"} == 0
+          for: 1m
+          labels:
+            severity: critical
+            component: api-gateway
+          annotations:
+            summary: "Redis is unavailable"
+            description: "API Gateway cannot connect to Redis for session/rate limit storage"
+
+        - alert: APIGatewayUpstreamDown
+          expr: |
+            sum(rate(upstream_request_errors_total{job="api-gateway", error_type="connection_error"}[5m])) by (upstream)
+            > 0.5
+          for: 2m
+          labels:
+            severity: warning
+            component: api-gateway
+          annotations:
+            summary: "Upstream service having connection issues"
+            description: "Upstream {{ $labels.upstream }} is experiencing connection errors"
+
+    # SLO Alerts
+    - name: api-gateway-slo
+      interval: 30s
+      rules:
+        - alert: APIGatewaySLOViolation
+          expr: |
+            (
+              sum(rate(http_requests_total{job="api-gateway", status!~"5.."}[30m]))
+              /
+              sum(rate(http_requests_total{job="api-gateway"}[30m]))
+            ) * 100 < 99.9
+          for: 5m
+          labels:
+            severity: critical
+            component: api-gateway
+          annotations:
+            summary: "SLO violation: availability below 99.9%"
+            description: "API Gateway availability is {{ $value | humanize }}%, below 99.9% SLO target"
