@@ -76,7 +76,9 @@ class RequestContext:
 
 
 # Type alias for middleware handler functions
-MiddlewareHandler = Callable[[web.Request, RequestContext], Any]
+from collections.abc import Awaitable
+
+MiddlewareHandler = Callable[[web.Request, RequestContext], Awaitable[web.Response]]
 
 
 class Middleware(ABC):

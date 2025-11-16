@@ -102,9 +102,11 @@ class TokenBucketAlgorithm(RateLimitAlgorithm):
         # Get current bucket state
         bucket_state = await self.store.get_bucket_state(key)
 
+        tokens: float
+        last_refill: float
         if bucket_state is None:
             # First request - initialize bucket
-            tokens = bucket_capacity - 1  # Consume one token
+            tokens = float(bucket_capacity - 1)  # Consume one token
             last_refill = now
         else:
             tokens, last_refill = bucket_state
@@ -112,7 +114,7 @@ class TokenBucketAlgorithm(RateLimitAlgorithm):
             # Calculate tokens to add based on time elapsed
             time_elapsed = now - last_refill
             tokens_to_add = time_elapsed * refill_rate
-            tokens = min(bucket_capacity, tokens + tokens_to_add)
+            tokens = min(float(bucket_capacity), tokens + tokens_to_add)
 
             # Try to consume a token
             if tokens >= 1:
@@ -303,6 +305,25 @@ class RateLimitStore(ABC):
     """Abstract base class for rate limiting state storage."""
 
     @abstractmethod
+    async def connect(self) -> None:
+        """Connect to the rate limit store."""
+        pass
+
+    @abstractmethod
+    async def disconnect(self) -> None:
+        """Disconnect from the rate limit store."""
+        pass
+
+    @abstractmethod
+    async def is_healthy(self) -> bool:
+        """Check if the store is healthy and operational.
+
+        Returns:
+            True if healthy, False otherwise
+        """
+        pass
+
+    @abstractmethod
     async def get_bucket_state(self, key: str) -> tuple[float, float] | None:
         """Get token bucket state.
 
@@ -395,7 +416,9 @@ class RedisRateLimitStore(RateLimitStore):
             return False
 
         try:
-            await self.client.ping()
+            ping_result = self.client.ping()
+            if hasattr(ping_result, "__await__"):
+                await ping_result
             return True
         except Exception:
             return False
@@ -448,7 +471,11 @@ class RedisRateLimitStore(RateLimitStore):
 
         try:
             bucket_key = self._bucket_key(key)
-            data = await self.client.hgetall(bucket_key)
+            hgetall_result = self.client.hgetall(bucket_key)
+            if hasattr(hgetall_result, "__await__"):
+                data = await hgetall_result
+            else:
+                data = hgetall_result
 
             if not data:
                 return None
@@ -479,14 +506,18 @@ class RedisRateLimitStore(RateLimitStore):
 
             # Use pipeline for atomic operation
             async with self.client.pipeline(transaction=True) as pipe:
-                await pipe.hset(
+                hset_result = pipe.hset(
                     bucket_key,
                     mapping={
                         "tokens": str(tokens),
                         "last_refill": str(last_refill),
                     },
                 )
-                await pipe.expire(bucket_key, ttl * 2)  # TTL = 2x window for safety
+                if hasattr(hset_result, "__await__"):
+                    await hset_result
+                expire_result = pipe.expire(bucket_key, ttl * 2)  # TTL = 2x window for safety
+                if hasattr(expire_result, "__await__"):
+                    await expire_result
                 await pipe.execute()
 
         except Exception as e:
@@ -508,7 +539,11 @@ class RedisRateLimitStore(RateLimitStore):
 
         try:
             window_key = self._window_key(key, window_start)
-            count = await self.client.get(window_key)
+            get_result = self.client.get(window_key)
+            if hasattr(get_result, "__await__"):
+                count = await get_result
+            else:
+                count = get_result
 
             return int(count) if count else 0
 
@@ -537,8 +572,12 @@ class RedisRateLimitStore(RateLimitStore):
 
             # Use pipeline for atomic increment and expiration
             async with self.client.pipeline(transaction=True) as pipe:
-                await pipe.incr(window_key)
-                await pipe.expire(window_key, window_duration * 2)  # TTL = 2x window
+                incr_result = pipe.incr(window_key)
+                if hasattr(incr_result, "__await__"):
+                    await incr_result
+                expire_result = pipe.expire(window_key, window_duration * 2)  # TTL = 2x window
+                if hasattr(expire_result, "__await__"):
+                    await expire_result
                 results = await pipe.execute()
 
             return int(results[0])

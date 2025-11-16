@@ -3,8 +3,6 @@
 import pytest
 from aiohttp.test_utils import TestClient
 
-from gateway.core.session_store import SessionData
-
 
 class TestEndToEndFlow:
     """Test complete request flow through the gateway."""

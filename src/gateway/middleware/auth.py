@@ -14,6 +14,7 @@ import hmac
 import json
 import logging
 from datetime import datetime, timedelta
+from typing import Any
 
 from aiohttp import web
 
@@ -122,7 +123,7 @@ class TokenValidator:
         if use_signed_tokens and not signing_secret:
             raise ValueError("signing_secret is required when use_signed_tokens=True")
 
-    def _verify_signature(self, token: str) -> dict | None:
+    def _verify_signature(self, token: str) -> dict[str, Any] | None:
         """Verify signed token signature and extract payload.
 
         Token format: <payload_base64>.<signature_base64>
@@ -134,6 +135,10 @@ class TokenValidator:
             Payload dict if signature is valid, None otherwise
         """
         try:
+            if not self.signing_secret:
+                logger.error("Cannot verify signature: signing_secret is None")
+                return None
+
             parts = token.split(".")
             if len(parts) != 2:
                 logger.debug("Invalid token format: expected 2 parts")
@@ -154,7 +159,7 @@ class TokenValidator:
             import base64
 
             payload_json = base64.b64decode(payload_b64).decode()
-            payload = json.loads(payload_json)
+            payload: dict[str, Any] = json.loads(payload_json)
 
             return payload
 
@@ -362,6 +367,9 @@ class TokenRefresher:
         """
         import base64
 
+        if not self.signing_secret:
+            raise RuntimeError("Cannot generate signed token: signing_secret is None")
+
         # Build payload
         payload = {
             "session_id": session_data.session_id,
@@ -407,7 +415,7 @@ class Authorizer:
             return True
 
         # Check if user has any of the required roles
-        user_roles = set(session_data.roles)
+        user_roles = set(session_data.roles or [])
         required = set(required_roles)
 
         return bool(user_roles & required)
@@ -535,8 +543,8 @@ class AuthenticationMiddleware(Middleware):
         # Populate context with user information
         context.user_id = session_data.user_id
         context.session_id = session_data.session_id
-        context.roles = session_data.roles
-        context.permissions = session_data.permissions
+        context.roles = session_data.roles or []
+        context.permissions = session_data.permissions or []
         context.authenticated = True
 
         # Check authorization

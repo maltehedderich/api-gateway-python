@@ -81,9 +81,7 @@ class SessionConfig(BaseModel):
     session_store_url: str = Field(
         default="redis://localhost:6379/0", description="Session store connection URL"
     )
-    token_signing_secret: str | None = Field(
-        default=None, description="Secret for signing tokens"
-    )
+    token_signing_secret: str | None = Field(default=None, description="Secret for signing tokens")
     token_ttl: int = Field(default=3600, ge=60, description="Token TTL in seconds")
     refresh_enabled: bool = Field(default=True, description="Enable token refresh")
     refresh_threshold: int = Field(default=300, ge=0, description="Refresh threshold in seconds")

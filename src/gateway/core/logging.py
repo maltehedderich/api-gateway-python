@@ -125,7 +125,7 @@ class JsonFormatter(logging.Formatter):
         Returns:
             Dictionary with sensitive fields redacted
         """
-        redacted = {}
+        redacted: dict[str, Any] = {}
         for key, value in data.items():
             if any(pattern.lower() in key.lower() for pattern in self.redact_patterns):
                 redacted[key] = "***REDACTED***"
@@ -184,6 +184,7 @@ class GatewayLogger:
         logger.handlers.clear()
 
         # Create handler based on output configuration
+        handler: logging.Handler
         if self.config.output == "stdout":
             handler = logging.StreamHandler(sys.stdout)
         elif self.config.output == "stderr":
@@ -193,6 +194,7 @@ class GatewayLogger:
             handler = logging.FileHandler(self.config.output)
 
         # Set formatter based on format configuration
+        formatter: logging.Formatter
         if self.config.format.lower() == "json":
             formatter = JsonFormatter(redact_patterns=self.config.redact_headers)
         else:
@@ -351,13 +353,14 @@ class GatewayLogger:
             **kwargs: Additional fields to log
         """
         logger = self.get_logger()
-        extra_fields = {
-            "event_type": event,
-            "auth": {"user_id": user_id, "success": success},
-        }
+        auth_data: dict[str, Any] = {"user_id": user_id, "success": success}
         if reason:
-            extra_fields["auth"]["reason"] = reason
+            auth_data["reason"] = reason
 
+        extra_fields: dict[str, Any] = {
+            "event_type": event,
+            "auth": auth_data,
+        }
         extra_fields.update(kwargs)
 
         log_level = logging.INFO if success else logging.WARNING
@@ -421,18 +424,19 @@ class GatewayLogger:
             **kwargs: Additional fields to log
         """
         logger = self.get_logger()
-        extra_fields = {
-            "event_type": "upstream_request",
-            "upstream": {
-                "url": upstream_url,
-                "method": method,
-                "status_code": status_code,
-                "latency_ms": latency_ms,
-            },
+        upstream_data: dict[str, Any] = {
+            "url": upstream_url,
+            "method": method,
+            "status_code": status_code,
+            "latency_ms": latency_ms,
         }
         if error:
-            extra_fields["upstream"]["error"] = error
+            upstream_data["error"] = error
 
+        extra_fields: dict[str, Any] = {
+            "event_type": "upstream_request",
+            "upstream": upstream_data,
+        }
         extra_fields.update(kwargs)
 
         log_level = logging.ERROR if error else logging.DEBUG

@@ -9,7 +9,8 @@ Or for headless mode:
 """
 
 import random
-from locust import HttpUser, task, between, constant_pacing
+
+from locust import HttpUser, between, constant_pacing, task
 
 
 class PublicRouteUser(HttpUser):
@@ -76,9 +77,9 @@ class AuthenticatedUser(HttpUser):
     @task(2)
     def update_user_data(self):
         """Test authenticated PUT endpoint."""
-        user_id = random.randint(100, 999)
+        random.randint(100, 999)
         payload = {"name": "Updated Name"}
-        self.client.put(f"/api/echo", json=payload)
+        self.client.put("/api/echo", json=payload)
 
     @task(1)
     def unauthorized_access(self):
@@ -192,9 +193,7 @@ class StressTestUser(HttpUser):
     def large_payload(self):
         """Test with large payloads."""
         large_payload = {"data": "x" * 100000}  # 100KB
-        with self.client.post(
-            "/api/echo", json=large_payload, catch_response=True
-        ) as response:
+        with self.client.post("/api/echo", json=large_payload, catch_response=True) as response:
             if response.status_code in [200, 413]:  # 413 = Payload Too Large
                 response.success()
 

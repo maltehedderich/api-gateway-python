@@ -120,6 +120,10 @@ class HTTPServer:
         if self.app is None:
             self.create_app()
 
+        # Ensure app is not None
+        if self.app is None:
+            raise RuntimeError("Failed to create application")
+
         # Create SSL context if TLS is enabled
         ssl_context = self._create_ssl_context()
 

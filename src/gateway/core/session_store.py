@@ -34,11 +34,11 @@ class SessionData:
     last_accessed_at: datetime
     expires_at: datetime
     revoked: bool = False
-    roles: list[str] = None
-    permissions: list[str] = None
+    roles: list[str] | None = None
+    permissions: list[str] | None = None
     ip_address: str | None = None
     device_fingerprint: str | None = None
-    metadata: dict[str, Any] = None
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         """Initialize default values for mutable fields."""
@@ -97,6 +97,16 @@ class SessionData:
 
 class SessionStore(ABC):
     """Abstract base class for session storage."""
+
+    @abstractmethod
+    async def connect(self) -> None:
+        """Connect to the session store."""
+        pass
+
+    @abstractmethod
+    async def disconnect(self) -> None:
+        """Disconnect from the session store."""
+        pass
 
     @abstractmethod
     async def create(self, session_data: SessionData) -> bool:
@@ -283,8 +293,12 @@ class RedisSessionStore(SessionStore):
 
             # Add to user sessions set
             user_sessions_key = self._user_sessions_key(session_data.user_id)
-            await self.client.sadd(user_sessions_key, session_data.session_id)
-            await self.client.expire(user_sessions_key, ttl)
+            result = self.client.sadd(user_sessions_key, session_data.session_id)
+            if hasattr(result, "__await__"):
+                await result
+            expire_result = self.client.expire(user_sessions_key, ttl)
+            if hasattr(expire_result, "__await__"):
+                await expire_result
 
             logger.debug(
                 f"Created session {session_data.session_id} for user {session_data.user_id}"
@@ -389,7 +403,9 @@ class RedisSessionStore(SessionStore):
             # Remove from user sessions set if we found the session
             if session_data:
                 user_sessions_key = self._user_sessions_key(session_data.user_id)
-                await self.client.srem(user_sessions_key, session_id)
+                srem_result = self.client.srem(user_sessions_key, session_id)
+                if hasattr(srem_result, "__await__"):
+                    await srem_result
 
             # Delete revocation key if exists
             revocation_key = self._revocation_key(session_id)
@@ -454,7 +470,11 @@ class RedisSessionStore(SessionStore):
         try:
             # Get all session IDs for user
             user_sessions_key = self._user_sessions_key(user_id)
-            session_ids = await self.client.smembers(user_sessions_key)
+            smembers_result = self.client.smembers(user_sessions_key)
+            if hasattr(smembers_result, "__await__"):
+                session_ids = await smembers_result
+            else:
+                session_ids = smembers_result
 
             count = 0
             for session_id in session_ids:

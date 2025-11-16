@@ -134,8 +134,8 @@ class Gateway:
             self.router, self.middleware_chain, self.config
         )
 
-        # Add to app middlewares
-        app.middlewares.append(handler_middleware)
+        # Add to app middlewares (need to cast as aiohttp expects specific middleware type)
+        app.middlewares.append(handler_middleware)  # type: ignore[arg-type]
 
         # Add health check routes
         if self.config.metrics.enabled:
@@ -219,7 +219,8 @@ class Gateway:
         Returns:
             Metrics in Prometheus format
         """
-        metrics_text = self.metrics.export_prometheus()
+        metrics_bytes = self.metrics.export_metrics()
+        metrics_text = metrics_bytes.decode("utf-8")
         return web.Response(text=metrics_text, content_type="text/plain; version=0.0.4")
 
     async def start(self) -> None:

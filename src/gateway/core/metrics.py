@@ -311,14 +311,14 @@ class GatewayMetrics:
 
         for name, check_func in self._health_checks.items():
             try:
-                result = check_func()
-                component_results.append(result)
+                health_result = check_func()
+                component_results.append(health_result)
 
                 # Determine overall status
-                if result.status == HealthStatus.UNHEALTHY:
+                if health_result.status == HealthStatus.UNHEALTHY:
                     overall_status = HealthStatus.UNHEALTHY
                 elif (
-                    result.status == HealthStatus.DEGRADED
+                    health_result.status == HealthStatus.DEGRADED
                     and overall_status == HealthStatus.HEALTHY
                 ):
                     overall_status = HealthStatus.DEGRADED
@@ -334,15 +334,15 @@ class GatewayMetrics:
                 )
                 overall_status = HealthStatus.UNHEALTHY
 
-        result: dict[str, Any] = {
+        response: dict[str, Any] = {
             "status": overall_status.value,
             "timestamp": time.time(),
         }
 
         if detailed:
-            result["components"] = [c.to_dict() for c in component_results]
+            response["components"] = [c.to_dict() for c in component_results]
 
-        return result
+        return response
 
     def check_liveness(self) -> dict[str, Any]:
         """Check if the service is alive (simple check).

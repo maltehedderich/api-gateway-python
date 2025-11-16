@@ -1,5 +1,7 @@
 """Shared pytest fixtures and configuration."""
 
+import contextlib
+
 import pytest
 from prometheus_client import REGISTRY
 
@@ -22,7 +24,5 @@ def reset_prometheus_registry():
     # Clean up after test
     collectors = list(REGISTRY._collector_to_names.keys())
     for collector in collectors:
-        try:
+        with contextlib.suppress(Exception):
             REGISTRY.unregister(collector)
-        except Exception:
-            pass

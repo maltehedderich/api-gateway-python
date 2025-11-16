@@ -1,14 +1,14 @@
 """Shared fixtures for integration tests."""
 
 import asyncio
+from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
-from typing import AsyncGenerator, Dict
 
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from gateway.core.config import GatewayConfig, RouteConfig, SessionConfig, RateLimitRule
+from gateway.core.config import GatewayConfig, RateLimitRule, RouteConfig
 from gateway.core.gateway import APIGateway
 from gateway.core.session_store import InMemorySessionStore, SessionData
 

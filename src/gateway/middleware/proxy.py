@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 import aiohttp
 from aiohttp import web
 
+from gateway.core.config import GatewayConfig
 from gateway.core.middleware import Middleware, MiddlewareHandler, RequestContext
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ class UpstreamProxyClient:
     Manages connection pooling, timeouts, and request forwarding.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: GatewayConfig) -> None:
         """Initialize the upstream proxy client.
 
         Args:
@@ -259,7 +260,7 @@ class ProxyMiddleware(Middleware):
     - Handle upstream errors and timeouts
     """
 
-    def __init__(self, config):
+    def __init__(self, config: GatewayConfig) -> None:
         """Initialize the proxy middleware.
 
         Args:
@@ -340,7 +341,7 @@ class ProxyMiddleware(Middleware):
 
             # Prepare response headers
             response_headers = self._prepare_response_headers(
-                upstream_response.headers,
+                dict(upstream_response.headers),
                 context,
             )
 

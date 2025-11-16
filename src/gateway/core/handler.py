@@ -132,9 +132,14 @@ class RequestHandler:
             )
 
 
+from collections.abc import Awaitable, Callable
+
+
 def create_handler_middleware(
     router: Router, middleware_chain: MiddlewareChain, config: GatewayConfig
-) -> web.middleware:
+) -> Callable[
+    [web.Request, Callable[[web.Request], Awaitable[web.Response]]], Awaitable[web.Response]
+]:
     """Create an aiohttp middleware that uses our request handler.
 
     Args:
@@ -148,7 +153,9 @@ def create_handler_middleware(
     handler = RequestHandler(router, middleware_chain, config)
 
     @web.middleware
-    async def middleware(request: web.Request, handler_func: web.Handler) -> web.Response:
+    async def middleware(
+        request: web.Request, handler_func: Callable[[web.Request], Awaitable[web.Response]]
+    ) -> web.Response:
         """aiohttp middleware function.
 
         Args:

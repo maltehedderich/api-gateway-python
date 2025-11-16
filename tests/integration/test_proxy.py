@@ -67,9 +67,7 @@ class TestUpstreamProxying:
     async def test_path_parameters_forwarded(self, gateway_client: TestClient, test_session):
         """Test that path parameters are correctly forwarded."""
         # Use authenticated session for /api/users route
-        gateway_client.session.cookie_jar.update_cookies(
-            {"session_token": test_session.session_id}
-        )
+        gateway_client.session.cookie_jar.update_cookies({"session_token": test_session.session_id})
 
         response = await gateway_client.get("/api/users/12345")
 
@@ -121,9 +119,7 @@ class TestProxyHeaders:
         self, gateway_client: TestClient, test_session
     ):
         """Test that X-User-ID header is added for authenticated requests."""
-        gateway_client.session.cookie_jar.update_cookies(
-            {"session_token": test_session.session_id}
-        )
+        gateway_client.session.cookie_jar.update_cookies({"session_token": test_session.session_id})
 
         response = await gateway_client.post("/api/echo", json={})
 
@@ -147,9 +143,7 @@ class TestProxyHeaders:
         # Should be localhost:8888 or similar (upstream host)
 
     @pytest.mark.asyncio
-    async def test_sensitive_headers_not_forwarded(
-        self, gateway_client: TestClient, test_session
-    ):
+    async def test_sensitive_headers_not_forwarded(self, gateway_client: TestClient, test_session):
         """Test that sensitive headers are not forwarded to upstream."""
         # Cookie header should not be forwarded to upstream
         headers = {"Cookie": "sensitive=data"}
@@ -157,7 +151,7 @@ class TestProxyHeaders:
         response = await gateway_client.post("/api/echo", json={}, headers=headers)
 
         assert response.status == 200
-        data = await response.json()
+        await response.json()
 
         # Sensitive headers should be stripped
         # (Implementation may vary - some gateways forward cookies, others don't)
@@ -175,9 +169,7 @@ class TestProxyResponseHandling:
         assert response.status == 200
 
     @pytest.mark.asyncio
-    async def test_upstream_response_headers_forwarded(
-        self, gateway_client: TestClient
-    ):
+    async def test_upstream_response_headers_forwarded(self, gateway_client: TestClient):
         """Test that upstream response headers are forwarded to client."""
         response = await gateway_client.get("/api/hello")
 
@@ -258,7 +250,7 @@ class TestProxyConnectionManagement:
     async def test_connection_reuse(self, gateway_client: TestClient):
         """Test that connections to upstream are reused (connection pooling)."""
         # Make multiple requests to same upstream
-        for i in range(10):
+        for _i in range(10):
             response = await gateway_client.get("/api/hello")
             assert response.status == 200
 
@@ -303,7 +295,7 @@ class TestProxyMetrics:
         response = await gateway_client.get("/metrics")
         assert response.status == 200
 
-        content = await response.text()
+        await response.text()
 
         # Check for upstream metrics
         # e.g., "gateway_upstream_requests_total"
@@ -318,7 +310,7 @@ class TestProxyMetrics:
         response = await gateway_client.get("/metrics")
         assert response.status == 200
 
-        content = await response.text()
+        await response.text()
 
         # Check for upstream error metrics
 
@@ -331,7 +323,7 @@ class TestProxyMetrics:
         response = await gateway_client.get("/metrics")
         assert response.status == 200
 
-        content = await response.text()
+        await response.text()
 
         # Check for timeout metrics
 
