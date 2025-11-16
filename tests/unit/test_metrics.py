@@ -69,9 +69,7 @@ def test_record_request(gateway_metrics: GatewayMetrics) -> None:
 def test_normalize_path(gateway_metrics: GatewayMetrics) -> None:
     """Test path normalization for metrics."""
     # Test UUID replacement
-    normalized = gateway_metrics._normalize_path(
-        "/api/users/550e8400-e29b-41d4-a716-446655440000"
-    )
+    normalized = gateway_metrics._normalize_path("/api/users/550e8400-e29b-41d4-a716-446655440000")
     assert normalized == "/api/users/:id"
 
     # Test numeric ID replacement

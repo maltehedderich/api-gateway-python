@@ -10,9 +10,6 @@ This module implements the routing engine including:
 import logging
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
-
-from aiohttp import web
 
 from gateway.core.config import RouteConfig
 
@@ -24,7 +21,7 @@ class RouteMatch:
     """Represents a matched route with extracted parameters."""
 
     route: RouteConfig
-    path_params: Dict[str, str]
+    path_params: dict[str, str]
 
 
 class PathMatcher:
@@ -45,7 +42,7 @@ class PathMatcher:
         self.pattern = pattern
         self.regex_pattern, self.param_names = self._compile_pattern(pattern)
 
-    def _compile_pattern(self, pattern: str) -> Tuple[re.Pattern, List[str]]:
+    def _compile_pattern(self, pattern: str) -> tuple[re.Pattern, list[str]]:
         """Compile path pattern into regex.
 
         Args:
@@ -82,7 +79,7 @@ class PathMatcher:
 
         return regex, param_names
 
-    def match(self, path: str) -> Optional[Dict[str, str]]:
+    def match(self, path: str) -> dict[str, str] | None:
         """Match a path against this pattern.
 
         Args:
@@ -113,14 +110,14 @@ class Router:
     - Resolving route conflicts based on priority
     """
 
-    def __init__(self, routes: List[RouteConfig]):
+    def __init__(self, routes: list[RouteConfig]):
         """Initialize the router.
 
         Args:
             routes: List of route configurations
         """
         self.routes = routes
-        self._route_matchers: List[Tuple[RouteConfig, PathMatcher]] = []
+        self._route_matchers: list[tuple[RouteConfig, PathMatcher]] = []
         self._initialize_routes()
 
     def _initialize_routes(self) -> None:
@@ -142,7 +139,7 @@ class Router:
         # Sort by priority:
         # 1. Number of literal segments (more is higher priority)
         # 2. Total length (longer is higher priority)
-        def route_priority(item: Tuple[RouteConfig, PathMatcher]) -> Tuple[int, int]:
+        def route_priority(item: tuple[RouteConfig, PathMatcher]) -> tuple[int, int]:
             route, matcher = item
             pattern = route.path_pattern
 
@@ -159,7 +156,7 @@ class Router:
             extra={"route_count": len(self.routes)},
         )
 
-    def match_route(self, path: str, method: str) -> Optional[RouteMatch]:
+    def match_route(self, path: str, method: str) -> RouteMatch | None:
         """Match a request to a route configuration.
 
         Args:
@@ -219,7 +216,7 @@ class Router:
 
         return path
 
-    def get_allowed_methods(self, path: str) -> List[str]:
+    def get_allowed_methods(self, path: str) -> list[str]:
         """Get allowed HTTP methods for a path.
 
         Used to generate the Allow header for 405 responses.
@@ -241,7 +238,7 @@ class Router:
         return sorted(allowed_methods)
 
 
-def create_router(routes: List[RouteConfig]) -> Router:
+def create_router(routes: list[RouteConfig]) -> Router:
     """Create a router instance (convenience function).
 
     Args:

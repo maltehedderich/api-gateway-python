@@ -1,7 +1,8 @@
 """Unit tests for session store module."""
 
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 
 from gateway.core.session_store import InMemorySessionStore, SessionData
 

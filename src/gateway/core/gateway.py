@@ -12,7 +12,6 @@ This module integrates all components:
 """
 
 import logging
-from typing import List
 
 from aiohttp import web
 
@@ -75,8 +74,7 @@ class Gateway:
             SessionStore instance
         """
         return RedisSessionStore(
-            redis_url=self.config.session.session_store_url,
-            key_prefix="session:"
+            redis_url=self.config.session.session_store_url, key_prefix="session:"
         )
 
     def _create_rate_limit_store(self) -> RateLimitStore:
@@ -88,8 +86,7 @@ class Gateway:
         # Check if Redis URL is provided for rate limiting
         if self.config.rate_limiting.store_url.startswith("redis://"):
             return RedisRateLimitStore(
-                redis_url=self.config.rate_limiting.store_url,
-                key_prefix="ratelimit:"
+                redis_url=self.config.rate_limiting.store_url, key_prefix="ratelimit:"
             )
         elif self.config.rate_limiting.store_url == "memory":
             # Use in-memory store for development/testing
@@ -98,8 +95,7 @@ class Gateway:
         else:
             # Default to Redis
             return RedisRateLimitStore(
-                redis_url=self.config.rate_limiting.store_url,
-                key_prefix="ratelimit:"
+                redis_url=self.config.rate_limiting.store_url, key_prefix="ratelimit:"
             )
 
     def _create_middleware_chain(self) -> MiddlewareChain:
@@ -116,7 +112,7 @@ class Gateway:
         Returns:
             MiddlewareChain instance
         """
-        middlewares: List[Middleware] = [
+        middlewares: list[Middleware] = [
             ErrorHandlingMiddleware(self.config),
             RequestLoggingMiddleware(self.config),
             AuthenticationMiddleware(self.config, self.session_store),
@@ -195,8 +191,7 @@ class Gateway:
 
         if not session_store_ready:
             return web.json_response(
-                {"status": "not_ready", "reason": "session_store_unavailable"},
-                status=503
+                {"status": "not_ready", "reason": "session_store_unavailable"}, status=503
             )
 
         # Check rate limit store health (only if rate limiting is enabled)
@@ -210,8 +205,7 @@ class Gateway:
 
             if not rate_limit_store_ready:
                 return web.json_response(
-                    {"status": "not_ready", "reason": "rate_limit_store_unavailable"},
-                    status=503
+                    {"status": "not_ready", "reason": "rate_limit_store_unavailable"}, status=503
                 )
 
         return web.json_response({"status": "ready"}, status=200)

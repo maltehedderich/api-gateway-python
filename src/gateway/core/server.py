@@ -9,8 +9,6 @@ This module implements the HTTP server foundation including:
 
 import logging
 import ssl
-from pathlib import Path
-from typing import Optional
 
 from aiohttp import web
 
@@ -47,9 +45,9 @@ class HTTPServer:
         self.config = config
         self.structured_logger = structured_logger
         self.metrics = metrics
-        self.app: Optional[web.Application] = None
-        self._runner: Optional[web.AppRunner] = None
-        self._site: Optional[web.TCPSite] = None
+        self.app: web.Application | None = None
+        self._runner: web.AppRunner | None = None
+        self._site: web.TCPSite | None = None
 
     def create_app(self) -> web.Application:
         """Create and configure the aiohttp application.
@@ -77,7 +75,7 @@ class HTTPServer:
         self.app = app
         return app
 
-    def _create_ssl_context(self) -> Optional[ssl.SSLContext]:
+    def _create_ssl_context(self) -> ssl.SSLContext | None:
         """Create SSL context for TLS support.
 
         Returns:

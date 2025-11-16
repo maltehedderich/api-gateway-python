@@ -11,8 +11,9 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from aiohttp import web
 
@@ -38,8 +39,8 @@ class RequestContext:
     # HTTP Request Data
     method: str
     path: str
-    query_params: Dict[str, str]
-    headers: Dict[str, str]
+    query_params: dict[str, str]
+    headers: dict[str, str]
     client_ip: str
     user_agent: str
 
@@ -48,22 +49,22 @@ class RequestContext:
     start_time: float = field(default_factory=time.time)
 
     # Route Information
-    route_match: Optional[RouteMatch] = None
+    route_match: RouteMatch | None = None
 
     # Authentication/Authorization Context (populated by auth middleware)
-    user_id: Optional[str] = None
-    session_id: Optional[str] = None
-    roles: List[str] = field(default_factory=list)
-    permissions: List[str] = field(default_factory=list)
+    user_id: str | None = None
+    session_id: str | None = None
+    roles: list[str] = field(default_factory=list)
+    permissions: list[str] = field(default_factory=list)
     authenticated: bool = False
 
     # Rate Limiting Context (populated by rate limiting middleware)
-    rate_limit_key: Optional[str] = None
-    rate_limit_remaining: Optional[int] = None
-    rate_limit_reset: Optional[int] = None
+    rate_limit_key: str | None = None
+    rate_limit_remaining: int | None = None
+    rate_limit_reset: int | None = None
 
     # Custom attributes for middleware to attach data
-    attributes: Dict[str, Any] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
 
     def elapsed_ms(self) -> float:
         """Calculate elapsed time since request start in milliseconds.
@@ -128,7 +129,7 @@ class MiddlewareChain:
     to call the next handler or short-circuit the chain by returning a response.
     """
 
-    def __init__(self, middlewares: List[Middleware]):
+    def __init__(self, middlewares: list[Middleware]):
         """Initialize the middleware chain.
 
         Args:
@@ -150,6 +151,7 @@ class MiddlewareChain:
         Returns:
             web.Response object
         """
+
         # Build the chain from the end
         async def build_handler(index: int) -> MiddlewareHandler:
             """Build handler at given index.
@@ -329,6 +331,7 @@ class ErrorHandlingMiddleware(Middleware):
 
             # Return 500 error response with timestamp per design spec section 6.1
             from datetime import datetime
+
             return web.json_response(
                 {
                     "error": "internal_error",
@@ -340,7 +343,9 @@ class ErrorHandlingMiddleware(Middleware):
             )
 
 
-def create_request_context(request: web.Request, correlation_id: Optional[str] = None) -> RequestContext:
+def create_request_context(
+    request: web.Request, correlation_id: str | None = None
+) -> RequestContext:
     """Create a request context from an aiohttp request.
 
     Args:

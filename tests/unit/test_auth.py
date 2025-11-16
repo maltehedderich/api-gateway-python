@@ -1,21 +1,17 @@
 """Unit tests for authentication middleware."""
 
-import pytest
 from datetime import datetime, timedelta
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock
 
+import pytest
 from aiohttp import web
 
-from gateway.core.config import GatewayConfig, RouteConfig, SessionConfig
-from gateway.core.middleware import RequestContext
-from gateway.core.routing import RouteMatch
 from gateway.core.session_store import InMemorySessionStore, SessionData
 from gateway.middleware.auth import (
-    TokenExtractor,
-    TokenValidator,
-    TokenRefresher,
     Authorizer,
-    AuthenticationMiddleware,
+    TokenExtractor,
+    TokenRefresher,
+    TokenValidator,
 )
 
 

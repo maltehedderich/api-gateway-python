@@ -6,15 +6,11 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 
-from gateway.core.config import GatewayConfig, LoggingConfig
+from gateway.core.config import GatewayConfig
 from gateway.core.middleware import (
-    ErrorHandlingMiddleware,
     Middleware,
     MiddlewareChain,
     RequestContext,
-    RequestLoggingMiddleware,
-    ResponseLoggingMiddleware,
-    create_request_context,
 )
 
 
@@ -98,7 +94,7 @@ class TestMiddlewareChain:
         middleware2 = DummyMiddleware(config, "second")
         middleware3 = DummyMiddleware(config, "third")
 
-        chain = MiddlewareChain([middleware1, middleware2, middleware3])
+        MiddlewareChain([middleware1, middleware2, middleware3])
 
         # Create a mock request
         app = web.Application()
@@ -112,7 +108,7 @@ class TestMiddlewareChain:
         )
         request._app = app
 
-        context = RequestContext(
+        RequestContext(
             method="GET",
             path="/test",
             query_params={},
@@ -133,7 +129,7 @@ class TestMiddlewareChain:
         middleware2 = ShortCircuitMiddleware(config)
         middleware3 = DummyMiddleware(config, "third")
 
-        chain = MiddlewareChain([middleware1, middleware2, middleware3])
+        MiddlewareChain([middleware1, middleware2, middleware3])
 
         # Create mock request and context
         # Similar to above, this is simplified

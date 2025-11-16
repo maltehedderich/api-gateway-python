@@ -11,11 +11,8 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
 
 import redis.asyncio as redis
-
-from gateway.core.config import RateLimitRule
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +33,7 @@ class RateLimitState:
     remaining: int
     limit: int
     reset_at: int
-    retry_after: Optional[int] = None
+    retry_after: int | None = None
 
 
 class RateLimitAlgorithm(ABC):
@@ -48,7 +45,7 @@ class RateLimitAlgorithm(ABC):
         key: str,
         limit: int,
         window: int,
-        burst: Optional[int] = None,
+        burst: int | None = None,
     ) -> RateLimitState:
         """Check if request is within rate limit.
 
@@ -84,7 +81,7 @@ class TokenBucketAlgorithm(RateLimitAlgorithm):
         key: str,
         limit: int,
         window: int,
-        burst: Optional[int] = None,
+        burst: int | None = None,
     ) -> RateLimitState:
         """Check rate limit using token bucket algorithm.
 
@@ -169,7 +166,7 @@ class FixedWindowAlgorithm(RateLimitAlgorithm):
         key: str,
         limit: int,
         window: int,
-        burst: Optional[int] = None,
+        burst: int | None = None,
     ) -> RateLimitState:
         """Check rate limit using fixed window algorithm.
 
@@ -238,7 +235,7 @@ class SlidingWindowAlgorithm(RateLimitAlgorithm):
         key: str,
         limit: int,
         window: int,
-        burst: Optional[int] = None,
+        burst: int | None = None,
     ) -> RateLimitState:
         """Check rate limit using sliding window algorithm.
 
@@ -306,7 +303,7 @@ class RateLimitStore(ABC):
     """Abstract base class for rate limiting state storage."""
 
     @abstractmethod
-    async def get_bucket_state(self, key: str) -> Optional[tuple[float, float]]:
+    async def get_bucket_state(self, key: str) -> tuple[float, float] | None:
         """Get token bucket state.
 
         Args:
@@ -318,9 +315,7 @@ class RateLimitStore(ABC):
         pass
 
     @abstractmethod
-    async def set_bucket_state(
-        self, key: str, tokens: float, last_refill: float, ttl: int
-    ) -> None:
+    async def set_bucket_state(self, key: str, tokens: float, last_refill: float, ttl: int) -> None:
         """Set token bucket state.
 
         Args:
@@ -373,7 +368,7 @@ class RedisRateLimitStore(RateLimitStore):
         """
         self.redis_url = redis_url
         self.key_prefix = key_prefix
-        self.client: Optional[redis.Redis] = None
+        self.client: redis.Redis | None = None
 
     async def connect(self) -> None:
         """Connect to Redis."""
@@ -439,7 +434,7 @@ class RedisRateLimitStore(RateLimitStore):
         """
         return f"{self._make_key(key)}:window:{window_start}"
 
-    async def get_bucket_state(self, key: str) -> Optional[tuple[float, float]]:
+    async def get_bucket_state(self, key: str) -> tuple[float, float] | None:
         """Get token bucket state from Redis.
 
         Args:
@@ -467,9 +462,7 @@ class RedisRateLimitStore(RateLimitStore):
             logger.error(f"Failed to get bucket state for {key}: {e}")
             return None
 
-    async def set_bucket_state(
-        self, key: str, tokens: float, last_refill: float, ttl: int
-    ) -> None:
+    async def set_bucket_state(self, key: str, tokens: float, last_refill: float, ttl: int) -> None:
         """Set token bucket state in Redis.
 
         Args:
@@ -580,7 +573,7 @@ class InMemoryRateLimitStore(RateLimitStore):
         """
         return True
 
-    async def get_bucket_state(self, key: str) -> Optional[tuple[float, float]]:
+    async def get_bucket_state(self, key: str) -> tuple[float, float] | None:
         """Get token bucket state.
 
         Args:
@@ -591,9 +584,7 @@ class InMemoryRateLimitStore(RateLimitStore):
         """
         return self.buckets.get(key)
 
-    async def set_bucket_state(
-        self, key: str, tokens: float, last_refill: float, ttl: int
-    ) -> None:
+    async def set_bucket_state(self, key: str, tokens: float, last_refill: float, ttl: int) -> None:
         """Set token bucket state.
 
         Args:

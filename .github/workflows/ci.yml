@@ -10,9 +10,6 @@ jobs:
   lint-and-test:
     name: Lint, Type Check & Test
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11", "3.12"]
 
     services:
       redis:
@@ -29,57 +26,37 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
 
-      - name: Cache Poetry dependencies
-        uses: actions/cache@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
         with:
-          path: |
-            ~/.cache/pypoetry
-            .venv
-          key: ${{ runner.os }}-poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-${{ matrix.python-version }}-
-            ${{ runner.os }}-poetry-
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: 1.8.3
-          virtualenvs-create: true
-          virtualenvs-in-project: true
+          enable-cache: true
 
       - name: Install dependencies
-        run: poetry install --no-interaction --no-root
+        run: uv sync --all-extras
 
-      - name: Install project
-        run: poetry install --no-interaction
+      - name: Check formatting with Ruff
+        run: uv run ruff format --check src tests
 
-      - name: Check formatting with Black
-        run: poetry run black --check src tests
-
-      - name: Check import sorting with isort
-        run: poetry run isort --check-only src tests
-
-      - name: Lint with flake8
-        run: poetry run flake8 src tests
+      - name: Lint with Ruff
+        run: uv run ruff check src tests
 
       - name: Type check with mypy
-        run: poetry run mypy src
+        run: uv run mypy src
 
       - name: Run tests with coverage
         env:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
         run: |
-          poetry run pytest --cov=src --cov-report=xml --cov-report=term-missing
+          uv run pytest --cov=src --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
-        if: matrix.python-version == '3.10'
         with:
           file: ./coverage.xml
           flags: unittests
