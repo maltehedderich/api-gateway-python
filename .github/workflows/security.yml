@@ -45,10 +45,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run Bandit security linter
-        uses: mdegis/bandit-action@v1.0
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          path: "src"
-          level: medium
-          confidence: medium
-          exit_zero: true
+          python-version: '3.10'
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit security linter
+        run: bandit -r src -ll -ii -f screen
+        continue-on-error: true
