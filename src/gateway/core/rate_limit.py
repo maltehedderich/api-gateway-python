@@ -318,9 +318,7 @@ class RateLimitStore(ABC):
         pass
 
     @abstractmethod
-    async def set_bucket_state(
-        self, key: str, tokens: float, last_refill: float, ttl: int
-    ) -> None:
+    async def set_bucket_state(self, key: str, tokens: float, last_refill: float, ttl: int) -> None:
         """Set token bucket state.
 
         Args:
@@ -467,9 +465,7 @@ class RedisRateLimitStore(RateLimitStore):
             logger.error(f"Failed to get bucket state for {key}: {e}")
             return None
 
-    async def set_bucket_state(
-        self, key: str, tokens: float, last_refill: float, ttl: int
-    ) -> None:
+    async def set_bucket_state(self, key: str, tokens: float, last_refill: float, ttl: int) -> None:
         """Set token bucket state in Redis.
 
         Args:
@@ -591,9 +587,7 @@ class InMemoryRateLimitStore(RateLimitStore):
         """
         return self.buckets.get(key)
 
-    async def set_bucket_state(
-        self, key: str, tokens: float, last_refill: float, ttl: int
-    ) -> None:
+    async def set_bucket_state(self, key: str, tokens: float, last_refill: float, ttl: int) -> None:
         """Set token bucket state.
 
         Args:

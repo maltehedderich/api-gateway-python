@@ -102,14 +102,14 @@ class UpstreamProxyClient:
         parsed = urlparse(base_url)
 
         # Combine base path with request path
-        if parsed.path and parsed.path != '/':
+        if parsed.path and parsed.path != "/":
             # Base URL has a path component
-            full_path = parsed.path.rstrip('/') + request_path
+            full_path = parsed.path.rstrip("/") + request_path
         else:
             full_path = request_path
 
         # Reconstruct the URL with scheme and netloc from base_url
-        scheme = parsed.scheme or 'http'
+        scheme = parsed.scheme or "http"
         netloc = parsed.netloc
 
         # Construct the full URL
@@ -146,10 +146,10 @@ class UpstreamProxyClient:
 
         # Copy most headers from original request
         skip_headers = {
-            'host',  # Will be set to upstream host
-            'connection',  # Will be managed by aiohttp
-            'transfer-encoding',  # Will be managed by aiohttp
-            'content-length',  # Will be recalculated if needed
+            "host",  # Will be set to upstream host
+            "connection",  # Will be managed by aiohttp
+            "transfer-encoding",  # Will be managed by aiohttp
+            "content-length",  # Will be recalculated if needed
         }
 
         for key, value in request_headers.items():
@@ -158,27 +158,27 @@ class UpstreamProxyClient:
 
         # Set Host header to upstream service
         parsed_url = urlparse(upstream_url)
-        headers['Host'] = parsed_url.netloc
+        headers["Host"] = parsed_url.netloc
 
         # Add X-Forwarded-* headers
         # X-Forwarded-For: append client IP
-        existing_xff = request_headers.get('X-Forwarded-For', '')
+        existing_xff = request_headers.get("X-Forwarded-For", "")
         if existing_xff:
-            headers['X-Forwarded-For'] = f"{existing_xff}, {client_ip}"
+            headers["X-Forwarded-For"] = f"{existing_xff}, {client_ip}"
         else:
-            headers['X-Forwarded-For'] = client_ip
+            headers["X-Forwarded-For"] = client_ip
 
         # X-Forwarded-Proto: preserve or set based on original request
-        if 'X-Forwarded-Proto' not in headers:
+        if "X-Forwarded-Proto" not in headers:
             # Determine protocol from upstream URL
-            headers['X-Forwarded-Proto'] = parsed_url.scheme or 'http'
+            headers["X-Forwarded-Proto"] = parsed_url.scheme or "http"
 
         # X-Request-ID: correlation ID for tracing
-        headers['X-Request-ID'] = correlation_id
+        headers["X-Request-ID"] = correlation_id
 
         # X-User-ID: optionally add authenticated user ID
         if user_id:
-            headers['X-User-ID'] = user_id
+            headers["X-User-ID"] = user_id
 
         return headers
 
@@ -463,9 +463,9 @@ class ProxyMiddleware(Middleware):
 
         # Skip headers that shouldn't be forwarded or will be set by aiohttp
         skip_headers = {
-            'connection',
-            'transfer-encoding',
-            'content-encoding',  # Let aiohttp handle encoding
+            "connection",
+            "transfer-encoding",
+            "content-encoding",  # Let aiohttp handle encoding
         }
 
         # Copy headers from upstream response
@@ -475,12 +475,12 @@ class ProxyMiddleware(Middleware):
 
         # Add rate limit headers if available
         if context.rate_limit_remaining is not None:
-            headers['X-RateLimit-Remaining'] = str(context.rate_limit_remaining)
+            headers["X-RateLimit-Remaining"] = str(context.rate_limit_remaining)
 
         if context.rate_limit_reset is not None:
-            headers['X-RateLimit-Reset'] = str(context.rate_limit_reset)
+            headers["X-RateLimit-Reset"] = str(context.rate_limit_reset)
 
         # Add correlation ID for tracing
-        headers['X-Request-ID'] = context.correlation_id
+        headers["X-Request-ID"] = context.correlation_id
 
         return headers

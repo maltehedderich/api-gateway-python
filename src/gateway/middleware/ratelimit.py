@@ -105,9 +105,7 @@ class RateLimitKeyGenerator:
         route_id = context.route_match.route.id if context.route_match else "unknown"
         return f"route:{route_id}:{rule.name}"
 
-    def _generate_composite_key(
-        self, context: RequestContext, rule: RateLimitRule
-    ) -> str:
+    def _generate_composite_key(self, context: RequestContext, rule: RateLimitRule) -> str:
         """Generate composite key based on multiple dimensions.
 
         Combines user (or IP) + route for fine-grained control.
@@ -169,9 +167,7 @@ class RateLimitEvaluator:
             algorithm_name, self.algorithms["token_bucket"]  # Default to token bucket
         )
 
-    async def evaluate(
-        self, context: RequestContext, rule: RateLimitRule
-    ) -> RateLimitState:
+    async def evaluate(self, context: RequestContext, rule: RateLimitRule) -> RateLimitState:
         """Evaluate rate limiting rule for a request.
 
         Args:
@@ -313,9 +309,7 @@ class RateLimitingMiddleware(Middleware):
 
         return applicable_rules
 
-    def _add_rate_limit_headers(
-        self, response: web.Response, state: RateLimitState
-    ) -> None:
+    def _add_rate_limit_headers(self, response: web.Response, state: RateLimitState) -> None:
         """Add rate limit headers to response.
 
         Args:
@@ -364,9 +358,7 @@ class RateLimitingMiddleware(Middleware):
 
             # Populate context with rate limiting info (from first/most restrictive rule)
             if context.rate_limit_key is None:
-                context.rate_limit_key = self.evaluator.key_generator.generate_key(
-                    context, rule
-                )
+                context.rate_limit_key = self.evaluator.key_generator.generate_key(context, rule)
                 context.rate_limit_remaining = state.remaining
                 context.rate_limit_reset = state.reset_at
 

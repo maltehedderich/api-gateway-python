@@ -351,9 +351,7 @@ class TestProxyMiddleware:
         middleware = ProxyMiddleware(gateway_config)
 
         # Mock timeout error
-        middleware.proxy_client.forward_request = AsyncMock(
-            side_effect=asyncio.TimeoutError()
-        )
+        middleware.proxy_client.forward_request = AsyncMock(side_effect=asyncio.TimeoutError())
 
         mock_request = AsyncMock()
         mock_request.query_string = ""
@@ -477,9 +475,7 @@ class TestProxyMiddleware:
         # Should add correlation ID
         assert headers["X-Request-ID"] == "test-correlation-id"
 
-    def test_prepare_response_headers_without_rate_limit(
-        self, gateway_config, request_context
-    ):
+    def test_prepare_response_headers_without_rate_limit(self, gateway_config, request_context):
         """Test response header preparation without rate limit info."""
         middleware = ProxyMiddleware(gateway_config)
 
