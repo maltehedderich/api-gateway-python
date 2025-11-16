@@ -7,6 +7,8 @@ This module integrates all components:
 - Configuration
 - Logging
 - Metrics
+- Session Store
+- Authentication
 """
 
 import logging
@@ -27,6 +29,8 @@ from gateway.core.middleware import (
 )
 from gateway.core.routing import Router
 from gateway.core.server import HTTPServer
+from gateway.core.session_store import RedisSessionStore, SessionStore
+from gateway.middleware.auth import AuthenticationMiddleware
 from gateway.middleware.proxy import ProxyMiddleware
 
 logger = logging.getLogger(__name__)
@@ -48,8 +52,23 @@ class Gateway:
         self.structured_logger = StructuredLogger(config.logging)
         self.metrics = MetricsCollector(config.metrics)
         self.router = Router(config.routes)
+
+        # Initialize session store
+        self.session_store = self._create_session_store()
+
         self.middleware_chain = self._create_middleware_chain()
         self.server = HTTPServer(config, self.structured_logger, self.metrics)
+
+    def _create_session_store(self) -> SessionStore:
+        """Create session store instance.
+
+        Returns:
+            SessionStore instance
+        """
+        return RedisSessionStore(
+            redis_url=self.config.session.session_store_url,
+            key_prefix="session:"
+        )
 
     def _create_middleware_chain(self) -> MiddlewareChain:
         """Create the middleware chain.
@@ -57,11 +76,10 @@ class Gateway:
         Middleware execution order:
         1. Error handling (wraps everything)
         2. Request logging
-        3. Authentication (placeholder - to be implemented in 9.3)
-        4. Authorization (placeholder - to be implemented in 9.3)
-        5. Rate limiting (placeholder - to be implemented in 9.4)
-        6. Proxy (placeholder - to be implemented in 9.5)
-        7. Response logging
+        3. Authentication and Authorization (section 9.3)
+        4. Rate limiting (to be implemented in 9.4)
+        5. Proxy
+        6. Response logging
 
         Returns:
             MiddlewareChain instance
@@ -69,8 +87,7 @@ class Gateway:
         middlewares: List[Middleware] = [
             ErrorHandlingMiddleware(self.config),
             RequestLoggingMiddleware(self.config),
-            # TODO: Add AuthenticationMiddleware when implemented (section 9.3)
-            # TODO: Add AuthorizationMiddleware when implemented (section 9.3)
+            AuthenticationMiddleware(self.config, self.session_store),
             # TODO: Add RateLimitingMiddleware when implemented (section 9.4)
             ProxyMiddleware(self.config),
             ResponseLoggingMiddleware(self.config),
@@ -135,7 +152,21 @@ class Gateway:
         Returns:
             Readiness status response
         """
-        # TODO: Check dependencies (session store, rate limiter) when implemented
+        # Check session store connectivity
+        try:
+            # Simple connectivity check - try to get a non-existent key
+            await self.session_store.get("readiness-check")
+            session_store_ready = True
+        except Exception as e:
+            logger.error(f"Session store not ready: {e}")
+            session_store_ready = False
+
+        if not session_store_ready:
+            return web.json_response(
+                {"status": "not_ready", "reason": "session_store_unavailable"},
+                status=503
+            )
+
         return web.json_response({"status": "ready"}, status=200)
 
     async def _metrics_endpoint(self, request: web.Request) -> web.Response:
@@ -157,6 +188,9 @@ class Gateway:
             extra={"environment": self.config.environment, "routes": len(self.config.routes)},
         )
 
+        # Connect to session store
+        await self.session_store.connect()
+
         # Create and configure app
         app = self.server.create_app()
         self._setup_routes(app)
@@ -170,6 +204,10 @@ class Gateway:
         """Stop the gateway."""
         logger.info("Stopping API Gateway...")
         await self.server.stop()
+
+        # Disconnect from session store
+        await self.session_store.disconnect()
+
         logger.info("API Gateway stopped")
 
     async def run_forever(self) -> None:
