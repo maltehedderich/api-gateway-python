@@ -56,9 +56,53 @@ metrics:
 
 # Example routes (to be customized per deployment)
 routes:
-  - id: "health_check"
-    path_pattern: "/health"
+  # Public status endpoint (no auth required)
+  - id: "public_status"
+    path_pattern: "/api/v1/status"
     methods: ["GET"]
-    upstream_url: "http://localhost:8080"
+    upstream_url: "http://localhost:8081"
     auth_required: false
-    timeout: 5
+    timeout: 10
+
+  # Users API endpoints
+  - id: "users_list"
+    path_pattern: "/api/v1/users"
+    methods: ["GET", "POST"]
+    upstream_url: "http://localhost:8081"
+    auth_required: true
+    auth_roles: ["user"]
+    timeout: 30
+
+  - id: "user_by_id"
+    path_pattern: "/api/v1/users/{user_id}"
+    methods: ["GET", "PUT", "DELETE"]
+    upstream_url: "http://localhost:8081"
+    auth_required: true
+    auth_roles: ["user"]
+    timeout: 30
+
+  # Products API endpoints
+  - id: "products_list"
+    path_pattern: "/api/v1/products"
+    methods: ["GET"]
+    upstream_url: "http://localhost:8082"
+    auth_required: true
+    auth_roles: ["user"]
+    timeout: 30
+
+  - id: "product_by_id"
+    path_pattern: "/api/v1/products/{product_id}"
+    methods: ["GET", "PUT", "DELETE"]
+    upstream_url: "http://localhost:8082"
+    auth_required: true
+    auth_roles: ["user", "admin"]
+    timeout: 30
+
+  # Admin-only endpoint
+  - id: "admin_settings"
+    path_pattern: "/api/v1/admin/settings"
+    methods: ["GET", "POST"]
+    upstream_url: "http://localhost:8083"
+    auth_required: true
+    auth_roles: ["admin"]
+    timeout: 30
