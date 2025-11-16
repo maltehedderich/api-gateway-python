@@ -5,6 +5,7 @@ to handle incoming HTTP requests.
 """
 
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 
 from aiohttp import web
@@ -130,9 +131,6 @@ class RequestHandler:
                 status=500,
                 headers=headers,
             )
-
-
-from collections.abc import Awaitable, Callable
 
 
 def create_handler_middleware(

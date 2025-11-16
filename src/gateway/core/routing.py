@@ -173,19 +173,18 @@ class Router:
         for route, matcher in self._route_matchers:
             path_params = matcher.match(normalized_path)
 
-            if path_params is not None:
-                # Path matched, now check HTTP method
-                if method.upper() in [m.upper() for m in route.methods]:
-                    logger.debug(
-                        f"Route matched: {route.id}",
-                        extra={
-                            "route_id": route.id,
-                            "path": normalized_path,
-                            "method": method,
-                            "params": path_params,
-                        },
-                    )
-                    return RouteMatch(route=route, path_params=path_params)
+            # Path matched, now check HTTP method
+            if path_params is not None and method.upper() in [m.upper() for m in route.methods]:
+                logger.debug(
+                    f"Route matched: {route.id}",
+                    extra={
+                        "route_id": route.id,
+                        "path": normalized_path,
+                        "method": method,
+                        "params": path_params,
+                    },
+                )
+                return RouteMatch(route=route, path_params=path_params)
 
         logger.debug(
             f"No route matched for {method} {path}",

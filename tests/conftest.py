@@ -14,10 +14,8 @@ def reset_prometheus_registry():
 
     # Unregister all collectors except default ones
     for collector in collectors:
-        try:
+        with contextlib.suppress(Exception):
             REGISTRY.unregister(collector)
-        except Exception:
-            pass  # Ignore errors for default collectors
 
     yield
 

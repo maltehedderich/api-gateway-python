@@ -11,7 +11,7 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -76,8 +76,6 @@ class RequestContext:
 
 
 # Type alias for middleware handler functions
-from collections.abc import Awaitable
-
 MiddlewareHandler = Callable[[web.Request, RequestContext], Awaitable[web.Response]]
 
 
@@ -169,7 +167,10 @@ class MiddlewareChain:
                 async def end_handler(req: web.Request, ctx: RequestContext) -> web.Response:
                     return web.Response(
                         status=500,
-                        text='{"error": "internal_error", "message": "End of middleware chain reached without response"}',
+                        text=(
+                            '{"error": "internal_error", '
+                            '"message": "End of middleware chain reached without response"}'
+                        ),
                         content_type="application/json",
                     )
 

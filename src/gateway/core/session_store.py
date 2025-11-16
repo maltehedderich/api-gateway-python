@@ -608,11 +608,10 @@ class InMemorySessionStore(SessionStore):
         """
         session_data = self.sessions.pop(session_id, None)
 
-        if session_data:
-            # Remove from user sessions
-            if session_data.user_id in self.user_sessions:
-                with contextlib.suppress(ValueError):
-                    self.user_sessions[session_data.user_id].remove(session_id)
+        # Remove from user sessions
+        if session_data and session_data.user_id in self.user_sessions:
+            with contextlib.suppress(ValueError):
+                self.user_sessions[session_data.user_id].remove(session_id)
 
         self.revoked.discard(session_id)
         return True
