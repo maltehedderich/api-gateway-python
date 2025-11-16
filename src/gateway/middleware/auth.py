@@ -14,7 +14,7 @@ import hmac
 import json
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from aiohttp import web
@@ -503,6 +503,7 @@ class AuthenticationMiddleware(Middleware):
                     "error": "invalid_token",
                     "message": "Authentication required",
                     "correlation_id": context.correlation_id,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
                 },
                 status=401,
                 headers={"WWW-Authenticate": "Bearer"},
@@ -524,6 +525,7 @@ class AuthenticationMiddleware(Middleware):
                     "error": "invalid_token",
                     "message": "Session token is invalid or expired",
                     "correlation_id": context.correlation_id,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
                 },
                 status=401,
                 headers={"WWW-Authenticate": "Bearer"},
@@ -552,6 +554,7 @@ class AuthenticationMiddleware(Middleware):
                     "error": "forbidden",
                     "message": "Access denied",
                     "correlation_id": context.correlation_id,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
                 },
                 status=403,
             )

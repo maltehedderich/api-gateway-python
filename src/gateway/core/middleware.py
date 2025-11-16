@@ -259,15 +259,25 @@ class ResponseLoggingMiddleware(Middleware):
         # Get structured logger from app
         structured_logger = request.app.get("logger")
 
-        # Log response
+        # Log response with full context per design spec section 9.6 Task 28
         if structured_logger:
-            await structured_logger.log_response(
-                correlation_id=context.correlation_id,
-                status_code=response.status,
-                latency_ms=context.elapsed_ms(),
-                user_id=context.user_id,
-                route_id=context.route_match.route.id if context.route_match else None,
-            )
+            log_params = {
+                "correlation_id": context.correlation_id,
+                "status_code": response.status,
+                "latency_ms": context.elapsed_ms(),
+                "user_id": context.user_id,
+                "route_id": context.route_match.route.id if context.route_match else None,
+            }
+
+            # Add rate limiting context if available
+            if context.rate_limit_key:
+                log_params["ratelimit"] = {
+                    "key": context.rate_limit_key,
+                    "remaining": context.rate_limit_remaining,
+                    "reset_at": context.rate_limit_reset,
+                }
+
+            await structured_logger.log_response(**log_params)
 
         # Update metrics
         metrics = request.app.get("metrics")
@@ -317,12 +327,14 @@ class ErrorHandlingMiddleware(Middleware):
                 },
             )
 
-            # Return 500 error response
+            # Return 500 error response with timestamp per design spec section 6.1
+            from datetime import datetime
             return web.json_response(
                 {
                     "error": "internal_error",
                     "message": "An unexpected error occurred",
                     "correlation_id": context.correlation_id,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
                 },
                 status=500,
             )
