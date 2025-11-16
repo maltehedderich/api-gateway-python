@@ -9,7 +9,7 @@ from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
 from gateway.core.config import GatewayConfig, RateLimitRule, RouteConfig
-from gateway.core.gateway import APIGateway
+from gateway.core.gateway import Gateway
 from gateway.core.session_store import InMemorySessionStore, SessionData
 
 
@@ -203,9 +203,9 @@ async def admin_session(session_store: InMemorySessionStore) -> SessionData:
 async def gateway(
     integration_config: GatewayConfig,
     session_store: InMemorySessionStore,
-) -> AsyncGenerator[APIGateway, None]:
+) -> AsyncGenerator[Gateway, None]:
     """Create and initialize an API Gateway instance for testing."""
-    gw = APIGateway(integration_config)
+    gw = Gateway(integration_config)
 
     # Override session store with test store
     gw.session_store = session_store
@@ -216,7 +216,7 @@ async def gateway(
 
 
 @pytest.fixture
-async def gateway_client(gateway: APIGateway) -> AsyncGenerator[TestClient, None]:
+async def gateway_client(gateway: Gateway) -> AsyncGenerator[TestClient, None]:
     """Create a test client for the gateway."""
     server = TestServer(gateway.app, port=9999)
     await server.start_server()
