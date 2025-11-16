@@ -1,0 +1,51 @@
+# Development Environment Configuration
+
+environment: development
+
+server:
+  host: "127.0.0.1"
+  port: 8080
+  tls_enabled: false
+
+logging:
+  level: "DEBUG"
+  format: "json"
+  output: "stdout"
+
+session:
+  cookie_name: "dev_session"
+  session_store_url: "redis://localhost:6379/0"
+  token_ttl: 7200  # 2 hours for development
+
+rate_limiting:
+  enabled: true
+  fail_mode: "open"
+  rules:
+    - name: "dev_default"
+      key_type: "ip"
+      algorithm: "token_bucket"
+      limit: 1000  # Higher limits for development
+      window: 60
+      burst: 1200
+
+upstream:
+  connection_timeout: 10
+  request_timeout: 60  # Longer timeout for debugging
+  retry_enabled: false
+
+routes:
+  - id: "api_users"
+    path_pattern: "/api/v1/users"
+    methods: ["GET", "POST"]
+    upstream_url: "http://localhost:9001"
+    auth_required: true
+    auth_roles: ["user"]
+    timeout: 30
+
+  - id: "api_admin"
+    path_pattern: "/api/v1/admin"
+    methods: ["GET", "POST", "PUT", "DELETE"]
+    upstream_url: "http://localhost:9002"
+    auth_required: true
+    auth_roles: ["admin"]
+    timeout: 30

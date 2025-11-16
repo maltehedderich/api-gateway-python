@@ -1,0 +1,64 @@
+# Default API Gateway Configuration
+# This is the base configuration that can be overridden by environment-specific configs
+
+environment: development
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  tls_enabled: false
+  connection_timeout: 60
+  keepalive_timeout: 75
+  max_connections: 1000
+
+logging:
+  level: "INFO"
+  format: "json"
+  output: "stdout"
+  correlation_id_header: "X-Request-ID"
+  redact_headers:
+    - "Authorization"
+    - "Cookie"
+    - "Set-Cookie"
+
+session:
+  cookie_name: "session_token"
+  session_store_url: "redis://localhost:6379/0"
+  token_ttl: 3600
+  refresh_enabled: true
+  refresh_threshold: 300
+
+rate_limiting:
+  enabled: true
+  store_url: "redis://localhost:6379/1"
+  fail_mode: "open"
+  rules:
+    - name: "global_default"
+      key_type: "ip"
+      algorithm: "token_bucket"
+      limit: 100
+      window: 60
+      burst: 120
+
+upstream:
+  connection_timeout: 5
+  request_timeout: 30
+  pool_size: 100
+  retry_enabled: false
+  retry_attempts: 2
+
+metrics:
+  enabled: true
+  endpoint: "/metrics"
+  health_endpoint: "/health"
+  liveness_endpoint: "/health/live"
+  readiness_endpoint: "/health/ready"
+
+# Example routes (to be customized per deployment)
+routes:
+  - id: "health_check"
+    path_pattern: "/health"
+    methods: ["GET"]
+    upstream_url: "http://localhost:8080"
+    auth_required: false
+    timeout: 5

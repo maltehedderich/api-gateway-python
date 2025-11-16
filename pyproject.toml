@@ -1,0 +1,68 @@
+[tool.poetry]
+name = "api-gateway"
+version = "0.1.0"
+description = "Python-based API Gateway with request logging, OAuth2 session-based authorization, and rate limiting"
+authors = ["API Gateway Team"]
+readme = "README.md"
+packages = [{include = "gateway", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+aiohttp = "^3.9.0"
+pyyaml = "^6.0"
+pydantic = "^2.5.0"
+prometheus-client = "^0.19.0"
+redis = {extras = ["hiredis"], version = "^5.0.1"}
+python-dotenv = "^1.0.0"
+cryptography = "^41.0.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-asyncio = "^0.21.1"
+pytest-cov = "^4.1.0"
+black = "^23.12.0"
+flake8 = "^6.1.0"
+mypy = "^1.7.1"
+isort = "^5.13.0"
+httpx = "^0.25.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["*/tests/*", "*/test_*.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
