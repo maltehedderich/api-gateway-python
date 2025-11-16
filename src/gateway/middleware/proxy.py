@@ -10,6 +10,7 @@ This module implements the upstream proxying functionality including:
 
 import asyncio
 import logging
+from datetime import datetime
 from typing import Dict, Optional
 from urllib.parse import urljoin, urlparse
 
@@ -298,6 +299,7 @@ class ProxyMiddleware(Middleware):
                     "error": "internal_error",
                     "message": "No route match found",
                     "correlation_id": context.correlation_id,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
                 },
                 status=500,
             )
@@ -382,6 +384,7 @@ class ProxyMiddleware(Middleware):
                     "error": "gateway_timeout",
                     "message": "Upstream service did not respond in time",
                     "correlation_id": context.correlation_id,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
                 },
                 status=504,
             )
@@ -402,6 +405,7 @@ class ProxyMiddleware(Middleware):
                     "error": "bad_gateway",
                     "message": "Could not connect to upstream service",
                     "correlation_id": context.correlation_id,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
                 },
                 status=502,
             )
@@ -422,6 +426,7 @@ class ProxyMiddleware(Middleware):
                     "error": "bad_gateway",
                     "message": "Error communicating with upstream service",
                     "correlation_id": context.correlation_id,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
                 },
                 status=502,
             )
@@ -441,6 +446,7 @@ class ProxyMiddleware(Middleware):
                     "error": "internal_error",
                     "message": "An unexpected error occurred",
                     "correlation_id": context.correlation_id,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
                 },
                 status=500,
             )

@@ -5,6 +5,7 @@ to handle incoming HTTP requests.
 """
 
 import logging
+from datetime import datetime
 
 from aiohttp import web
 
@@ -66,6 +67,7 @@ class RequestHandler:
                         "error": "method_not_allowed",
                         "message": f"Method {context.method} not allowed for this path",
                         "correlation_id": context.correlation_id,
+                        "timestamp": datetime.utcnow().isoformat() + "Z",
                     },
                     status=405,
                     headers={**headers, "Allow": ", ".join(allowed_methods)},
@@ -77,6 +79,7 @@ class RequestHandler:
                         "error": "not_found",
                         "message": "The requested resource was not found",
                         "correlation_id": context.correlation_id,
+                        "timestamp": datetime.utcnow().isoformat() + "Z",
                     },
                     status=404,
                     headers=headers,
@@ -122,6 +125,7 @@ class RequestHandler:
                     "error": "internal_error",
                     "message": "An unexpected error occurred",
                     "correlation_id": context.correlation_id,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
                 },
                 status=500,
                 headers=headers,

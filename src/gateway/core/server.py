@@ -15,8 +15,8 @@ from typing import Optional
 from aiohttp import web
 
 from gateway.core.config import GatewayConfig
-from gateway.core.logging import StructuredLogger
-from gateway.core.metrics import MetricsCollector
+from gateway.core.logging import GatewayLogger
+from gateway.core.metrics import GatewayMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -34,15 +34,15 @@ class HTTPServer:
     def __init__(
         self,
         config: GatewayConfig,
-        structured_logger: StructuredLogger,
-        metrics: MetricsCollector,
+        structured_logger: GatewayLogger,
+        metrics: GatewayMetrics,
     ):
         """Initialize the HTTP server.
 
         Args:
             config: Gateway configuration
-            structured_logger: Structured logger instance
-            metrics: Metrics collector instance
+            structured_logger: Gateway logger instance
+            metrics: Gateway metrics instance
         """
         self.config = config
         self.structured_logger = structured_logger

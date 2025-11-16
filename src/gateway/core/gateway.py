@@ -18,8 +18,8 @@ from aiohttp import web
 
 from gateway.core.config import GatewayConfig
 from gateway.core.handler import create_handler_middleware
-from gateway.core.logging import StructuredLogger
-from gateway.core.metrics import MetricsCollector
+from gateway.core.logging import GatewayLogger
+from gateway.core.metrics import GatewayMetrics
 from gateway.core.middleware import (
     ErrorHandlingMiddleware,
     Middleware,
@@ -27,11 +27,17 @@ from gateway.core.middleware import (
     RequestLoggingMiddleware,
     ResponseLoggingMiddleware,
 )
+from gateway.core.rate_limit import (
+    InMemoryRateLimitStore,
+    RateLimitStore,
+    RedisRateLimitStore,
+)
 from gateway.core.routing import Router
 from gateway.core.server import HTTPServer
 from gateway.core.session_store import RedisSessionStore, SessionStore
 from gateway.middleware.auth import AuthenticationMiddleware
 from gateway.middleware.proxy import ProxyMiddleware
+from gateway.middleware.ratelimit import RateLimitingMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +55,15 @@ class Gateway:
             config: Gateway configuration
         """
         self.config = config
-        self.structured_logger = StructuredLogger(config.logging)
-        self.metrics = MetricsCollector(config.metrics)
+        self.structured_logger = GatewayLogger(config.logging)
+        self.metrics = GatewayMetrics(config.metrics)
         self.router = Router(config.routes)
 
         # Initialize session store
         self.session_store = self._create_session_store()
+
+        # Initialize rate limit store
+        self.rate_limit_store = self._create_rate_limit_store()
 
         self.middleware_chain = self._create_middleware_chain()
         self.server = HTTPServer(config, self.structured_logger, self.metrics)
@@ -70,15 +79,38 @@ class Gateway:
             key_prefix="session:"
         )
 
+    def _create_rate_limit_store(self) -> RateLimitStore:
+        """Create rate limit store instance.
+
+        Returns:
+            RateLimitStore instance
+        """
+        # Check if Redis URL is provided for rate limiting
+        if self.config.rate_limiting.store_url.startswith("redis://"):
+            return RedisRateLimitStore(
+                redis_url=self.config.rate_limiting.store_url,
+                key_prefix="ratelimit:"
+            )
+        elif self.config.rate_limiting.store_url == "memory":
+            # Use in-memory store for development/testing
+            logger.warning("Using in-memory rate limit store - not suitable for production")
+            return InMemoryRateLimitStore()
+        else:
+            # Default to Redis
+            return RedisRateLimitStore(
+                redis_url=self.config.rate_limiting.store_url,
+                key_prefix="ratelimit:"
+            )
+
     def _create_middleware_chain(self) -> MiddlewareChain:
         """Create the middleware chain.
 
-        Middleware execution order:
+        Middleware execution order (section 9.6):
         1. Error handling (wraps everything)
         2. Request logging
         3. Authentication and Authorization (section 9.3)
-        4. Rate limiting (to be implemented in 9.4)
-        5. Proxy
+        4. Rate limiting (section 9.4)
+        5. Proxy (section 9.5)
         6. Response logging
 
         Returns:
@@ -88,7 +120,7 @@ class Gateway:
             ErrorHandlingMiddleware(self.config),
             RequestLoggingMiddleware(self.config),
             AuthenticationMiddleware(self.config, self.session_store),
-            # TODO: Add RateLimitingMiddleware when implemented (section 9.4)
+            RateLimitingMiddleware(self.config, self.rate_limit_store),
             ProxyMiddleware(self.config),
             ResponseLoggingMiddleware(self.config),
         ]
@@ -167,6 +199,21 @@ class Gateway:
                 status=503
             )
 
+        # Check rate limit store health (only if rate limiting is enabled)
+        rate_limit_store_ready = True
+        if self.config.rate_limiting.enabled:
+            try:
+                rate_limit_store_ready = await self.rate_limit_store.is_healthy()
+            except Exception as e:
+                logger.error(f"Rate limit store not ready: {e}")
+                rate_limit_store_ready = False
+
+            if not rate_limit_store_ready:
+                return web.json_response(
+                    {"status": "not_ready", "reason": "rate_limit_store_unavailable"},
+                    status=503
+                )
+
         return web.json_response({"status": "ready"}, status=200)
 
     async def _metrics_endpoint(self, request: web.Request) -> web.Response:
@@ -191,6 +238,9 @@ class Gateway:
         # Connect to session store
         await self.session_store.connect()
 
+        # Connect to rate limit store
+        await self.rate_limit_store.connect()
+
         # Create and configure app
         app = self.server.create_app()
         self._setup_routes(app)
@@ -207,6 +257,9 @@ class Gateway:
 
         # Disconnect from session store
         await self.session_store.disconnect()
+
+        # Disconnect from rate limit store
+        await self.rate_limit_store.disconnect()
 
         logger.info("API Gateway stopped")
 
