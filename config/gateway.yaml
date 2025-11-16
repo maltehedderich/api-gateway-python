@@ -33,12 +33,39 @@ rate_limiting:
   store_url: "redis://localhost:6379/1"
   fail_mode: "open"
   rules:
-    - name: "global_default"
+    # Global IP-based rate limit (applies to all routes)
+    - name: "global_ip_limit"
       key_type: "ip"
       algorithm: "token_bucket"
       limit: 100
       window: 60
       burst: 120
+
+    # Per-user rate limit (applies to authenticated users on all routes)
+    - name: "authenticated_user_limit"
+      key_type: "user"
+      algorithm: "token_bucket"
+      limit: 500
+      window: 60
+      burst: 600
+
+    # Admin endpoints - stricter composite rate limit
+    - name: "admin_endpoint_limit"
+      key_type: "composite"
+      algorithm: "sliding_window"
+      limit: 20
+      window: 60
+      routes:
+        - "admin_settings"
+
+    # Public endpoints - fixed window for simplicity
+    - name: "public_status_limit"
+      key_type: "ip"
+      algorithm: "fixed_window"
+      limit: 10
+      window: 60
+      routes:
+        - "public_status"
 
 upstream:
   connection_timeout: 5
