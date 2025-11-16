@@ -1,11 +1,10 @@
 """Unit tests for the proxy middleware."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock
 
 import aiohttp
 import pytest
-from aiohttp import web
 
 from gateway.core.config import GatewayConfig, RouteConfig, UpstreamConfig
 from gateway.core.middleware import RequestContext

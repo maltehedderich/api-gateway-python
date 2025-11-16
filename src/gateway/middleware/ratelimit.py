@@ -7,7 +7,6 @@ This module implements:
 """
 
 import logging
-from typing import Optional
 
 from aiohttp import web
 

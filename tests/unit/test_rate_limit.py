@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -12,7 +12,6 @@ from gateway.core.rate_limit import (
     FixedWindowAlgorithm,
     InMemoryRateLimitStore,
     RateLimitState,
-    RedisRateLimitStore,
     SlidingWindowAlgorithm,
     TokenBucketAlgorithm,
 )

@@ -1,8 +1,6 @@
 """Unit tests for configuration module."""
 
-import os
 from pathlib import Path
-from typing import Any, Dict
 
 import pytest
 import yaml

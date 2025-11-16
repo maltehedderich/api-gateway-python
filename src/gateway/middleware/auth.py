@@ -13,7 +13,6 @@ import hashlib
 import hmac
 import json
 import logging
-import secrets
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -495,7 +494,7 @@ class AuthenticationMiddleware(Middleware):
 
         if not token:
             logger.info(
-                f"Authentication required but no token provided",
+                "Authentication required but no token provided",
                 extra={
                     "correlation_id": context.correlation_id,
                     "path": context.path,
@@ -516,7 +515,7 @@ class AuthenticationMiddleware(Middleware):
 
         if not session_data:
             logger.info(
-                f"Invalid or expired token",
+                "Invalid or expired token",
                 extra={
                     "correlation_id": context.correlation_id,
                     "path": context.path,

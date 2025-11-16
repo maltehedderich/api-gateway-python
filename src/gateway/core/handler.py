@@ -9,7 +9,7 @@ import logging
 from aiohttp import web
 
 from gateway.core.config import GatewayConfig
-from gateway.core.middleware import MiddlewareChain, RequestContext, create_request_context
+from gateway.core.middleware import MiddlewareChain, create_request_context
 from gateway.core.routing import Router
 
 logger = logging.getLogger(__name__)

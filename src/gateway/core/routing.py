@@ -12,8 +12,6 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
-from aiohttp import web
-
 from gateway.core.config import RouteConfig
 
 logger = logging.getLogger(__name__)

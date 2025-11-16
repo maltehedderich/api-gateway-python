@@ -9,7 +9,6 @@ This module implements the HTTP server foundation including:
 
 import logging
 import ssl
-from pathlib import Path
 from typing import Optional
 
 from aiohttp import web
@@ -142,8 +141,9 @@ class HTTPServer:
         await self._site.start()
 
         protocol = "https" if ssl_context else "http"
+        server_url = f"{protocol}://{self.config.server.host}:{self.config.server.port}"
         logger.info(
-            f"HTTP server started on {protocol}://{self.config.server.host}:{self.config.server.port}",
+            f"HTTP server started on {server_url}",
             extra={
                 "host": self.config.server.host,
                 "port": self.config.server.port,

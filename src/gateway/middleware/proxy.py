@@ -11,7 +11,7 @@ This module implements the upstream proxying functionality including:
 import asyncio
 import logging
 from typing import Dict, Optional
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 import aiohttp
 from aiohttp import web

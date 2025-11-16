@@ -15,8 +15,6 @@ from typing import Optional
 
 import redis.asyncio as redis
 
-from gateway.core.config import RateLimitRule
-
 logger = logging.getLogger(__name__)
 
 

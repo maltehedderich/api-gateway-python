@@ -164,9 +164,13 @@ class MiddlewareChain:
             if index >= len(self.middlewares):
                 # End of chain - should not reach here in normal flow
                 async def end_handler(req: web.Request, ctx: RequestContext) -> web.Response:
+                    error_msg = (
+                        '{"error": "internal_error", '
+                        '"message": "End of middleware chain reached without response"}'
+                    )
                     return web.Response(
                         status=500,
-                        text='{"error": "internal_error", "message": "End of middleware chain reached without response"}',
+                        text=error_msg,
                         content_type="application/json",
                     )
 
