@@ -7,7 +7,7 @@ This module implements:
 """
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from aiohttp import web
 
@@ -377,7 +377,7 @@ class RateLimitingMiddleware(Middleware):
                         "error": "rate_limit_exceeded",
                         "message": "Too many requests, please try again later",
                         "correlation_id": context.correlation_id,
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
+                        "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                     },
                     status=429,
                 )

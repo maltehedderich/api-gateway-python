@@ -226,7 +226,7 @@ class TokenValidator:
                 return None
 
             exp_dt = datetime.fromisoformat(exp)
-            if datetime.utcnow() >= exp_dt:
+            if datetime.now(UTC) >= exp_dt:
                 logger.info("Token is expired")
                 return None
 
@@ -234,7 +234,7 @@ class TokenValidator:
             nbf = payload.get("nbf")
             if nbf:
                 nbf_dt = datetime.fromisoformat(nbf)
-                if datetime.utcnow() < nbf_dt:
+                if datetime.now(UTC) < nbf_dt:
                     logger.info("Token not yet valid (nbf)")
                     return None
 
@@ -250,9 +250,9 @@ class TokenValidator:
                 user_id=payload.get("user_id", ""),
                 username=payload.get("username", ""),
                 created_at=datetime.fromisoformat(
-                    payload.get("iat", datetime.utcnow().isoformat())
+                    payload.get("iat", datetime.now(UTC).isoformat())
                 ),
-                last_accessed_at=datetime.utcnow(),
+                last_accessed_at=datetime.now(UTC),
                 expires_at=exp_dt,
                 revoked=False,
                 roles=payload.get("roles", []),
@@ -318,7 +318,7 @@ class TokenRefresher:
         Returns:
             True if session should be refreshed, False otherwise
         """
-        time_until_expiry = (session_data.expires_at - datetime.utcnow()).total_seconds()
+        time_until_expiry = (session_data.expires_at - datetime.now(UTC)).total_seconds()
         return time_until_expiry < self.refresh_threshold
 
     async def refresh(self, session_data: SessionData) -> tuple[SessionData, str | None]:
@@ -335,8 +335,8 @@ class TokenRefresher:
 
         try:
             # Update session expiration
-            session_data.expires_at = datetime.utcnow() + timedelta(seconds=self.token_ttl)
-            session_data.last_accessed_at = datetime.utcnow()
+            session_data.expires_at = datetime.now(UTC) + timedelta(seconds=self.token_ttl)
+            session_data.last_accessed_at = datetime.now(UTC)
 
             # Update in store
             await self.session_store.update(session_data)
@@ -512,7 +512,7 @@ class AuthenticationMiddleware(Middleware):
                     "error": "invalid_token",
                     "message": "Authentication required",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=401,
                 headers={"WWW-Authenticate": "Bearer"},
@@ -534,7 +534,7 @@ class AuthenticationMiddleware(Middleware):
                     "error": "invalid_token",
                     "message": "Session token is invalid or expired",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=401,
                 headers={"WWW-Authenticate": "Bearer"},
@@ -563,7 +563,7 @@ class AuthenticationMiddleware(Middleware):
                     "error": "forbidden",
                     "message": "Access denied",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=403,
             )

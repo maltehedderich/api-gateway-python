@@ -29,7 +29,10 @@ def log_config() -> LoggingConfig:
 @pytest.fixture
 def gateway_logger(log_config: LoggingConfig) -> GatewayLogger:
     """Create a test gateway logger."""
-    return GatewayLogger(log_config)
+    logger = GatewayLogger(log_config)
+    # Enable propagation for testing so caplog can capture logs
+    logging.getLogger("gateway").propagate = True
+    return logger
 
 
 def test_correlation_id_filter() -> None:
@@ -166,7 +169,7 @@ def test_set_correlation_id(gateway_logger: GatewayLogger) -> None:
 
 def test_log_request(gateway_logger: GatewayLogger, caplog: pytest.LogCaptureFixture) -> None:
     """Test request logging."""
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="gateway"):
         gateway_logger.log_request(
             method="GET",
             path="/api/users",
@@ -184,7 +187,7 @@ def test_log_request(gateway_logger: GatewayLogger, caplog: pytest.LogCaptureFix
 def test_log_response(gateway_logger: GatewayLogger, caplog: pytest.LogCaptureFixture) -> None:
     """Test response logging."""
     # Test successful response (INFO level)
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="gateway"):
         gateway_logger.log_response(
             method="GET",
             path="/api/users",
@@ -200,7 +203,7 @@ def test_log_response(gateway_logger: GatewayLogger, caplog: pytest.LogCaptureFi
     caplog.clear()
 
     # Test client error (WARNING level)
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.WARNING, logger="gateway"):
         gateway_logger.log_response(
             method="GET", path="/api/users", status_code=404, latency_ms=10.0
         )
@@ -211,7 +214,7 @@ def test_log_response(gateway_logger: GatewayLogger, caplog: pytest.LogCaptureFi
     caplog.clear()
 
     # Test server error (ERROR level)
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.ERROR, logger="gateway"):
         gateway_logger.log_response(
             method="GET", path="/api/users", status_code=500, latency_ms=100.0
         )
@@ -222,7 +225,7 @@ def test_log_response(gateway_logger: GatewayLogger, caplog: pytest.LogCaptureFi
 
 def test_log_auth_event(gateway_logger: GatewayLogger, caplog: pytest.LogCaptureFixture) -> None:
     """Test authentication event logging."""
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="gateway"):
         gateway_logger.log_auth_event(event="auth_success", user_id="user-123", success=True)
 
     assert len(caplog.records) == 1
@@ -230,7 +233,7 @@ def test_log_auth_event(gateway_logger: GatewayLogger, caplog: pytest.LogCapture
 
     caplog.clear()
 
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.WARNING, logger="gateway"):
         gateway_logger.log_auth_event(
             event="auth_failure",
             user_id="user-456",
@@ -247,7 +250,7 @@ def test_log_rate_limit_event(
     gateway_logger: GatewayLogger, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Test rate limit event logging."""
-    with caplog.at_level(logging.DEBUG):
+    with caplog.at_level(logging.DEBUG, logger="gateway"):
         gateway_logger.log_rate_limit_event(
             key="user-123:/api/users", limit=100, current=50, exceeded=False
         )
@@ -257,7 +260,7 @@ def test_log_rate_limit_event(
 
     caplog.clear()
 
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.WARNING, logger="gateway"):
         gateway_logger.log_rate_limit_event(
             key="user-123:/api/users", limit=100, current=101, exceeded=True
         )
@@ -270,7 +273,7 @@ def test_log_upstream_event(
     gateway_logger: GatewayLogger, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Test upstream event logging."""
-    with caplog.at_level(logging.DEBUG):
+    with caplog.at_level(logging.DEBUG, logger="gateway"):
         gateway_logger.log_upstream_event(
             upstream_url="http://backend:8080/api/users",
             method="GET",
@@ -283,7 +286,7 @@ def test_log_upstream_event(
 
     caplog.clear()
 
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.ERROR, logger="gateway"):
         gateway_logger.log_upstream_event(
             upstream_url="http://backend:8080/api/users",
             method="GET",

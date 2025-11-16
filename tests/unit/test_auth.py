@@ -1,6 +1,6 @@
 """Unit tests for authentication middleware."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock
 
 import pytest
@@ -95,7 +95,7 @@ class TestTokenValidator:
     @pytest.fixture
     def sample_session(self):
         """Create sample session data."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         return SessionData(
             session_id="sess-123",
             user_id="user-456",
@@ -137,7 +137,7 @@ class TestTokenValidator:
 
     async def test_validate_opaque_token_expired(self, store):
         """Test validating an expired token."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         expired_session = SessionData(
             session_id="sess-expired",
             user_id="user-123",
@@ -156,7 +156,7 @@ class TestTokenValidator:
     async def test_validate_signed_token_success(self, store):
         """Test validating a valid signed token."""
         secret = "test-secret-key"
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # Create a refresher to generate a signed token
         refresher = TokenRefresher(
@@ -219,7 +219,7 @@ class TestTokenRefresher:
 
     async def test_should_refresh_true(self, store):
         """Test should_refresh returns True when near expiration."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         session = SessionData(
             session_id="sess-123",
             user_id="user-456",
@@ -239,7 +239,7 @@ class TestTokenRefresher:
 
     async def test_should_refresh_false(self, store):
         """Test should_refresh returns False when plenty of time remaining."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         session = SessionData(
             session_id="sess-123",
             user_id="user-456",
@@ -259,7 +259,7 @@ class TestTokenRefresher:
 
     async def test_refresh_session(self, store):
         """Test refreshing a session."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         old_expires_at = now + timedelta(seconds=60)
         session = SessionData(
             session_id="sess-123",
@@ -281,7 +281,7 @@ class TestTokenRefresher:
 
         assert new_token is not None
         # Check that the new expiration is significantly later (should be ~3600 seconds from now)
-        assert (updated_session.expires_at - datetime.utcnow()).total_seconds() > 3500
+        assert (updated_session.expires_at - datetime.now(UTC)).total_seconds() > 3500
 
 
 class TestAuthorizer:
@@ -289,7 +289,7 @@ class TestAuthorizer:
 
     def test_authorize_success(self):
         """Test authorization with matching role."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         session = SessionData(
             session_id="sess-123",
             user_id="user-456",
@@ -305,7 +305,7 @@ class TestAuthorizer:
 
     def test_authorize_failure(self):
         """Test authorization with no matching role."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         session = SessionData(
             session_id="sess-123",
             user_id="user-456",
@@ -321,7 +321,7 @@ class TestAuthorizer:
 
     def test_authorize_no_roles_required(self):
         """Test authorization when no roles required."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         session = SessionData(
             session_id="sess-123",
             user_id="user-456",
@@ -337,7 +337,7 @@ class TestAuthorizer:
 
     def test_authorize_multiple_required_roles(self):
         """Test authorization with multiple required roles (any match)."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         session = SessionData(
             session_id="sess-123",
             user_id="user-456",

@@ -2,7 +2,7 @@
 
 import asyncio
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from aiohttp import web
@@ -77,6 +77,10 @@ def integration_config(mock_upstream_server: TestServer) -> GatewayConfig:
     """Create gateway configuration for integration tests."""
     config = GatewayConfig()
 
+    # Use in-memory stores for testing
+    config.session.session_store_url = "memory"
+    config.rate_limiting.store_url = "memory"
+
     # Configure routes
     config.routes = [
         RouteConfig(
@@ -124,6 +128,15 @@ def integration_config(mock_upstream_server: TestServer) -> GatewayConfig:
             auth_roles=[],
             timeout=1,  # Short timeout for testing
         ),
+        RouteConfig(
+            id="error_route",
+            path_pattern="/api/error",
+            methods=["GET"],
+            upstream_url="http://localhost:8888",
+            auth_required=False,
+            auth_roles=[],
+            timeout=30,
+        ),
     ]
 
     # Configure rate limiting
@@ -147,10 +160,6 @@ def integration_config(mock_upstream_server: TestServer) -> GatewayConfig:
         ),
     ]
 
-    # Use in-memory stores for testing
-    config.session.store_type = "memory"
-    config.rate_limiting.store_type = "memory"
-
     return config
 
 
@@ -164,9 +173,9 @@ async def session_store() -> AsyncGenerator[InMemorySessionStore, None]:
 
 
 @pytest.fixture
-async def test_session(session_store: InMemorySessionStore) -> SessionData:
+async def test_session(gateway: Gateway) -> SessionData:
     """Create a test session."""
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     session = SessionData(
         session_id="test-session-123",
         user_id="user-123",
@@ -177,14 +186,14 @@ async def test_session(session_store: InMemorySessionStore) -> SessionData:
         roles=["user"],
         permissions=["read:data", "write:data"],
     )
-    await session_store.create(session)
+    await gateway.session_store.create(session)
     return session
 
 
 @pytest.fixture
-async def admin_session(session_store: InMemorySessionStore) -> SessionData:
+async def admin_session(gateway: Gateway) -> SessionData:
     """Create an admin test session."""
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     session = SessionData(
         session_id="admin-session-456",
         user_id="admin-456",
@@ -195,30 +204,28 @@ async def admin_session(session_store: InMemorySessionStore) -> SessionData:
         roles=["user", "admin"],
         permissions=["read:data", "write:data", "admin:all"],
     )
-    await session_store.create(session)
+    await gateway.session_store.create(session)
     return session
 
 
 @pytest.fixture
 async def gateway(
     integration_config: GatewayConfig,
-    session_store: InMemorySessionStore,
 ) -> AsyncGenerator[Gateway, None]:
     """Create and initialize an API Gateway instance for testing."""
     gw = Gateway(integration_config)
-
-    # Override session store with test store
-    gw.session_store = session_store
-
     await gw.start()
     yield gw
-    await gw.shutdown()
+    await gw.stop()
 
 
 @pytest.fixture
 async def gateway_client(gateway: Gateway) -> AsyncGenerator[TestClient, None]:
     """Create a test client for the gateway."""
-    server = TestServer(gateway.app, port=9999)
+    # Gateway.start() creates the app, so we access it via server.app
+    if gateway.server.app is None:
+        raise RuntimeError("Gateway app not initialized")
+    server = TestServer(gateway.server.app, port=9999)
     await server.start_server()
     client = TestClient(server)
     yield client

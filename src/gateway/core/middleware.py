@@ -225,7 +225,7 @@ class RequestLoggingMiddleware(Middleware):
 
         # Log request start
         if structured_logger:
-            await structured_logger.log_request(
+            structured_logger.log_request(
                 correlation_id=context.correlation_id,
                 method=context.method,
                 path=context.path,
@@ -282,7 +282,7 @@ class ResponseLoggingMiddleware(Middleware):
                     "reset_at": context.rate_limit_reset,
                 }
 
-            await structured_logger.log_response(**log_params)
+            structured_logger.log_response(**log_params)
 
         # Update metrics
         metrics = request.app.get("metrics")
@@ -333,14 +333,14 @@ class ErrorHandlingMiddleware(Middleware):
             )
 
             # Return 500 error response with timestamp per design spec section 6.1
-            from datetime import datetime
+            from datetime import UTC, datetime
 
             return web.json_response(
                 {
                     "error": "internal_error",
                     "message": "An unexpected error occurred",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=500,
             )

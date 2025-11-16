@@ -12,7 +12,7 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import redis.asyncio as redis
@@ -55,7 +55,7 @@ class SessionData:
         Returns:
             True if session is expired, False otherwise
         """
-        return datetime.utcnow() >= self.expires_at
+        return datetime.now(UTC) >= self.expires_at
 
     def is_valid(self) -> bool:
         """Check if session is valid (not expired and not revoked).
@@ -279,7 +279,7 @@ class RedisSessionStore(SessionStore):
 
         try:
             # Calculate TTL in seconds
-            ttl = int((session_data.expires_at - datetime.utcnow()).total_seconds())
+            ttl = int((session_data.expires_at - datetime.now(UTC)).total_seconds())
             if ttl <= 0:
                 logger.warning(f"Session {session_data.session_id} already expired, not creating")
                 return False
@@ -364,7 +364,7 @@ class RedisSessionStore(SessionStore):
                 return False
 
             # Calculate remaining TTL
-            ttl = int((session_data.expires_at - datetime.utcnow()).total_seconds())
+            ttl = int((session_data.expires_at - datetime.now(UTC)).total_seconds())
             if ttl <= 0:
                 await self.delete(session_data.session_id)
                 return False
@@ -443,7 +443,7 @@ class RedisSessionStore(SessionStore):
             await self.update(session_data)
 
             # Add to revocation set with TTL matching session expiration
-            ttl = int((session_data.expires_at - datetime.utcnow()).total_seconds())
+            ttl = int((session_data.expires_at - datetime.now(UTC)).total_seconds())
             if ttl > 0:
                 revocation_key = self._revocation_key(session_id)
                 await self.client.set(revocation_key, "1", ex=ttl)

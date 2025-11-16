@@ -1,6 +1,6 @@
 """Integration tests for authentication and authorization."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from aiohttp.test_utils import TestClient
@@ -52,7 +52,7 @@ class TestAuthentication:
     ):
         """Test accessing protected route with expired session token."""
         # Create expired session
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         expired_session = SessionData(
             session_id="expired-session",
             user_id="user-999",
@@ -230,7 +230,7 @@ class TestSessionLifecycle:
     ):
         """Test session token refresh when approaching expiration."""
         # Create session that's near expiration
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         near_expiration_session = SessionData(
             session_id="near-expiry-session",
             user_id="user-888",

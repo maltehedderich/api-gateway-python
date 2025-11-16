@@ -73,6 +73,12 @@ class Gateway:
         Returns:
             SessionStore instance
         """
+        # Support in-memory session store for testing/development
+        if self.config.session.session_store_url.startswith("memory"):
+            logger.warning("Using in-memory session store - not suitable for production")
+            from gateway.core.session_store import InMemorySessionStore
+
+            return InMemorySessionStore()
         return RedisSessionStore(
             redis_url=self.config.session.session_store_url, key_prefix="session:"
         )
