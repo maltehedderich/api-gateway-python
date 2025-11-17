@@ -267,23 +267,28 @@ class ResponseLoggingMiddleware(Middleware):
 
         # Log response with full context per design spec section 9.6 Task 28
         if structured_logger:
-            log_params = {
+            # Prepare extra fields for logging
+            extra_fields: dict[str, Any] = {
                 "correlation_id": context.correlation_id,
-                "status_code": response.status,
-                "latency_ms": context.elapsed_ms(),
-                "user_id": context.user_id,
                 "route_id": context.route_match.route.id if context.route_match else None,
             }
 
             # Add rate limiting context if available
             if context.rate_limit_key:
-                log_params["ratelimit"] = {
+                extra_fields["ratelimit"] = {
                     "key": context.rate_limit_key,
                     "remaining": context.rate_limit_remaining,
                     "reset_at": context.rate_limit_reset,
                 }
 
-            structured_logger.log_response(**log_params)
+            structured_logger.log_response(
+                method=context.method,
+                path=context.path,
+                status_code=response.status,
+                latency_ms=context.elapsed_ms(),
+                user_id=context.user_id,
+                **extra_fields,
+            )
 
         # Update metrics
         metrics = request.app.get(METRICS_KEY)
@@ -292,7 +297,7 @@ class ResponseLoggingMiddleware(Middleware):
                 method=context.method,
                 path=context.path,
                 status_code=response.status,
-                latency_ms=context.elapsed_ms(),
+                duration_seconds=context.elapsed_ms() / 1000.0,
             )
 
         return response
