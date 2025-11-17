@@ -79,9 +79,21 @@ class Gateway:
             from gateway.core.session_store import InMemorySessionStore
 
             return InMemorySessionStore()
-        return RedisSessionStore(
-            redis_url=self.config.session.session_store_url, key_prefix="session:"
-        )
+        elif self.config.session.session_store_url.startswith("dynamodb://"):
+            # DynamoDB session store for AWS Lambda
+            logger.info("Using DynamoDB session store")
+            from gateway.core.dynamodb_store import DynamoDBSessionStore
+            import os
+
+            # Extract table name from URL: dynamodb://table-name
+            table_name = self.config.session.session_store_url.replace("dynamodb://", "")
+            region = os.getenv("AWS_REGION_NAME") or os.getenv("AWS_REGION") or "us-east-1"
+            return DynamoDBSessionStore(table_name=table_name, region_name=region)
+        else:
+            # Default to Redis
+            return RedisSessionStore(
+                redis_url=self.config.session.session_store_url, key_prefix="session:"
+            )
 
     def _create_rate_limit_store(self) -> RateLimitStore:
         """Create rate limit store instance.
@@ -98,6 +110,16 @@ class Gateway:
             # Use in-memory store for development/testing
             logger.warning("Using in-memory rate limit store - not suitable for production")
             return InMemoryRateLimitStore()
+        elif self.config.rate_limiting.store_url.startswith("dynamodb://"):
+            # DynamoDB rate limit store for AWS Lambda
+            logger.info("Using DynamoDB rate limit store")
+            from gateway.core.dynamodb_store import DynamoDBRateLimitStore
+            import os
+
+            # Extract table name from URL: dynamodb://table-name
+            table_name = self.config.rate_limiting.store_url.replace("dynamodb://", "")
+            region = os.getenv("AWS_REGION_NAME") or os.getenv("AWS_REGION") or "us-east-1"
+            return DynamoDBRateLimitStore(table_name=table_name, region_name=region)
         else:
             # Default to Redis
             return RedisRateLimitStore(

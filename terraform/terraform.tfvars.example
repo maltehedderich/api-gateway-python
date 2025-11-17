@@ -1,0 +1,64 @@
+# Example Terraform variables file
+# Copy this file to terraform.tfvars and customize for your deployment
+
+# General configuration
+project_name = "api-gateway"
+environment  = "dev"
+aws_region   = "us-east-1"
+
+# Lambda configuration
+lambda_package_path = "./lambda-package.zip"  # Build with: scripts/build-lambda.sh
+lambda_memory_size  = 512                      # Adjust based on performance needs
+lambda_timeout      = 30                       # Max time for request processing
+
+# Application secrets (DO NOT commit these values!)
+# Use environment variables or AWS Secrets Manager in production
+token_signing_secret = "change-me-to-a-secure-random-string-at-least-32-characters-long"
+
+# Rate limiting
+rate_limiting_enabled = true
+
+# Logging
+log_level         = "INFO"
+log_retention_days = 7  # Increase for production (e.g., 30, 90)
+
+# Additional Lambda environment variables
+# Configure upstream service URLs here
+additional_lambda_env_vars = {
+  # Example upstream services (customize for your backend)
+  # UPSTREAM_USER_SERVICE_URL    = "https://users-api.example.com"
+  # UPSTREAM_PRODUCT_SERVICE_URL = "https://products-api.example.com"
+  # UPSTREAM_ADMIN_SERVICE_URL   = "https://admin-api.example.com"
+}
+
+# API Gateway configuration
+stage_name             = "v1"
+enable_access_logs     = true
+enable_api_throttling  = true
+throttling_burst_limit = 100
+throttling_rate_limit  = 50
+
+# CORS configuration (adjust for production)
+cors_allow_origins = ["*"]  # Change to specific domains in production
+cors_allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+cors_allow_headers = ["Content-Type", "Authorization", "X-Request-ID"]
+
+# CloudWatch alarms (recommended for production)
+enable_cloudwatch_alarms = false  # Set to true for production
+
+# DynamoDB configuration
+enable_pitr = false  # Set to true for production (adds cost)
+
+# Custom domain (optional)
+# Uncomment and configure if you want a custom domain
+# custom_domain_name      = "api.example.com"
+# create_acm_certificate  = true
+# create_route53_record   = true
+# route53_zone_id         = "Z1234567890ABC"  # Your Route53 zone ID
+
+# Additional tags
+tags = {
+  Owner       = "DevOps Team"
+  CostCenter  = "Engineering"
+  Terraform   = "true"
+}
