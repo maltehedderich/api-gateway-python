@@ -13,7 +13,6 @@ from aiohttp import web
 
 from gateway.core.config import GatewayConfig, RateLimitRule
 from gateway.core.middleware import Middleware, MiddlewareHandler, RequestContext
-from gateway.core.server import METRICS_KEY
 from gateway.core.rate_limit import (
     FixedWindowAlgorithm,
     RateLimitAlgorithm,
@@ -22,6 +21,7 @@ from gateway.core.rate_limit import (
     SlidingWindowAlgorithm,
     TokenBucketAlgorithm,
 )
+from gateway.core.server import METRICS_KEY
 
 logger = logging.getLogger(__name__)
 

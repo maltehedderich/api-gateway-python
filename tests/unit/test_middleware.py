@@ -4,7 +4,7 @@ import time
 
 import pytest
 from aiohttp import web
-from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
+from aiohttp.test_utils import AioHTTPTestCase
 
 from gateway.core.config import GatewayConfig
 from gateway.core.middleware import (

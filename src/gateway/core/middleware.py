@@ -18,8 +18,8 @@ from typing import Any
 from aiohttp import web
 
 from gateway.core.config import GatewayConfig
-from gateway.core.server import CONFIG_KEY, LOGGER_KEY, METRICS_KEY
 from gateway.core.routing import RouteMatch
+from gateway.core.server import CONFIG_KEY, LOGGER_KEY, METRICS_KEY
 
 logger = logging.getLogger(__name__)
 
