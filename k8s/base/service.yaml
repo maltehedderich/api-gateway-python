@@ -1,0 +1,91 @@
+---
+# Main service for the API Gateway
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  labels:
+    app: api-gateway
+    component: gateway
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: metrics
+    port: 8080
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app: api-gateway
+
+---
+# Headless service for StatefulSet-like deployments or internal discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-headless
+  labels:
+    app: api-gateway
+    component: gateway
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: false
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    protocol: TCP
+  selector:
+    app: api-gateway
+
+---
+# Service account for the gateway
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api-gateway
+  labels:
+    app: api-gateway
+    component: gateway
+
+---
+# Role for the gateway (if needed for any cluster operations)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: api-gateway
+  labels:
+    app: api-gateway
+    component: gateway
+rules:
+  # Add any necessary permissions here
+  # Example: reading ConfigMaps for dynamic config reload
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+---
+# RoleBinding for the gateway service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: api-gateway
+  labels:
+    app: api-gateway
+    component: gateway
+subjects:
+  - kind: ServiceAccount
+    name: api-gateway
+roleRef:
+  kind: Role
+  name: api-gateway
+  apiGroup: rbac.authorization.k8s.io

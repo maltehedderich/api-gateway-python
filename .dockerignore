@@ -1,0 +1,64 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Development files
+.env
+.env.local
+*.log
+logs/
+
+# Test files
+tests/
+.flake8
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Deployment files (not needed in image)
+k8s/
+deploy/
+Dockerfile*
+.dockerignore
+
+# OS files
+.DS_Store
+Thumbs.db
