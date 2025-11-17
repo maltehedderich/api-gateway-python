@@ -1,0 +1,227 @@
+---
+# PrometheusRule for API Gateway alerts
+# Requires Prometheus Operator
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: api-gateway-alerts
+  labels:
+    app: api-gateway
+    component: gateway
+    prometheus: kube-prometheus
+spec:
+  groups:
+  # High-level availability alerts
+  - name: api-gateway-availability
+    interval: 30s
+    rules:
+    # Alert when gateway pods are down
+    - alert: APIGatewayDown
+      expr: up{job="api-gateway"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        component: api-gateway
+      annotations:
+        summary: "API Gateway is down"
+        description: "API Gateway pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is down"
+
+    # Alert when too many pods are unavailable
+    - alert: APIGatewayInsufficientReplicas
+      expr: kube_deployment_status_replicas_available{deployment="api-gateway"} < 2
+      for: 5m
+      labels:
+        severity: critical
+        component: api-gateway
+      annotations:
+        summary: "API Gateway has insufficient replicas"
+        description: "API Gateway has only {{ $value }} replicas available, minimum is 2"
+
+  # Performance alerts
+  - name: api-gateway-performance
+    interval: 30s
+    rules:
+    # Alert when p99 latency is too high
+    - alert: APIGatewayHighLatency
+      expr: histogram_quantile(0.99, rate(gateway_request_duration_seconds_bucket[5m])) > 1
+      for: 5m
+      labels:
+        severity: warning
+        component: api-gateway
+      annotations:
+        summary: "API Gateway high latency"
+        description: "API Gateway p99 latency is {{ $value }}s, threshold is 1s"
+
+    # Alert when p95 latency is critically high
+    - alert: APIGatewayCriticalLatency
+      expr: histogram_quantile(0.95, rate(gateway_request_duration_seconds_bucket[5m])) > 2
+      for: 5m
+      labels:
+        severity: critical
+        component: api-gateway
+      annotations:
+        summary: "API Gateway critical latency"
+        description: "API Gateway p95 latency is {{ $value }}s, threshold is 2s"
+
+  # Error rate alerts
+  - name: api-gateway-errors
+    interval: 30s
+    rules:
+    # Alert on high 5xx error rate
+    - alert: APIGatewayHighServerErrorRate
+      expr: |
+        sum(rate(gateway_requests_total{status_code=~"5.."}[5m]))
+        /
+        sum(rate(gateway_requests_total[5m])) > 0.05
+      for: 5m
+      labels:
+        severity: critical
+        component: api-gateway
+      annotations:
+        summary: "API Gateway high server error rate"
+        description: "API Gateway 5xx error rate is {{ $value | humanizePercentage }}, threshold is 5%"
+
+    # Alert on high 4xx error rate
+    - alert: APIGatewayHighClientErrorRate
+      expr: |
+        sum(rate(gateway_requests_total{status_code=~"4.."}[5m]))
+        /
+        sum(rate(gateway_requests_total[5m])) > 0.20
+      for: 10m
+      labels:
+        severity: warning
+        component: api-gateway
+      annotations:
+        summary: "API Gateway high client error rate"
+        description: "API Gateway 4xx error rate is {{ $value | humanizePercentage }}, threshold is 20%"
+
+  # Authentication and authorization alerts
+  - name: api-gateway-security
+    interval: 30s
+    rules:
+    # Alert on high authentication failure rate
+    - alert: APIGatewayHighAuthFailureRate
+      expr: rate(gateway_auth_failures_total[5m]) > 10
+      for: 5m
+      labels:
+        severity: warning
+        component: api-gateway
+      annotations:
+        summary: "API Gateway high authentication failure rate"
+        description: "API Gateway authentication failures are {{ $value }}/sec, threshold is 10/sec"
+
+    # Alert on authentication failure spike (potential attack)
+    - alert: APIGatewayAuthFailureSpike
+      expr: |
+        rate(gateway_auth_failures_total[1m])
+        /
+        rate(gateway_auth_failures_total[10m] offset 10m) > 5
+      for: 2m
+      labels:
+        severity: critical
+        component: api-gateway
+      annotations:
+        summary: "API Gateway authentication failure spike"
+        description: "API Gateway authentication failures spiked by {{ $value }}x in the last minute"
+
+  # Rate limiting alerts
+  - name: api-gateway-ratelimiting
+    interval: 30s
+    rules:
+    # Alert when rate limiting is being triggered frequently
+    - alert: APIGatewayHighRateLimitRate
+      expr: rate(gateway_ratelimit_exceeded_total[5m]) > 5
+      for: 10m
+      labels:
+        severity: warning
+        component: api-gateway
+      annotations:
+        summary: "API Gateway high rate limit trigger rate"
+        description: "API Gateway rate limiting is being triggered {{ $value }}/sec, threshold is 5/sec"
+
+  # Upstream service alerts
+  - name: api-gateway-upstream
+    interval: 30s
+    rules:
+    # Alert on high upstream error rate
+    - alert: APIGatewayHighUpstreamErrorRate
+      expr: |
+        sum by (upstream) (rate(gateway_upstream_errors_total[5m]))
+        /
+        sum by (upstream) (rate(gateway_upstream_requests_total[5m])) > 0.10
+      for: 5m
+      labels:
+        severity: warning
+        component: api-gateway
+      annotations:
+        summary: "API Gateway high upstream error rate"
+        description: "Upstream {{ $labels.upstream }} error rate is {{ $value | humanizePercentage }}, threshold is 10%"
+
+    # Alert on high upstream latency
+    - alert: APIGatewayHighUpstreamLatency
+      expr: histogram_quantile(0.95, rate(gateway_upstream_duration_seconds_bucket[5m])) > 5
+      for: 5m
+      labels:
+        severity: warning
+        component: api-gateway
+      annotations:
+        summary: "API Gateway high upstream latency"
+        description: "Upstream p95 latency is {{ $value }}s, threshold is 5s"
+
+  # Resource utilization alerts
+  - name: api-gateway-resources
+    interval: 30s
+    rules:
+    # Alert on high memory usage
+    - alert: APIGatewayHighMemoryUsage
+      expr: |
+        container_memory_usage_bytes{pod=~"api-gateway-.*"}
+        /
+        container_spec_memory_limit_bytes{pod=~"api-gateway-.*"} > 0.90
+      for: 5m
+      labels:
+        severity: warning
+        component: api-gateway
+      annotations:
+        summary: "API Gateway high memory usage"
+        description: "Pod {{ $labels.pod }} memory usage is {{ $value | humanizePercentage }}, threshold is 90%"
+
+    # Alert on high CPU usage
+    - alert: APIGatewayHighCPUUsage
+      expr: |
+        rate(container_cpu_usage_seconds_total{pod=~"api-gateway-.*"}[5m])
+        /
+        container_spec_cpu_quota{pod=~"api-gateway-.*"} > 0.90
+      for: 10m
+      labels:
+        severity: warning
+        component: api-gateway
+      annotations:
+        summary: "API Gateway high CPU usage"
+        description: "Pod {{ $labels.pod }} CPU usage is {{ $value | humanizePercentage }}, threshold is 90%"
+
+  # Dependency alerts
+  - name: api-gateway-dependencies
+    interval: 30s
+    rules:
+    # Alert when Redis is unavailable
+    - alert: APIGatewayRedisUnavailable
+      expr: gateway_redis_connection_status == 0
+      for: 1m
+      labels:
+        severity: critical
+        component: api-gateway
+      annotations:
+        summary: "API Gateway Redis connection lost"
+        description: "API Gateway cannot connect to Redis session store"
+
+    # Alert on high Redis latency
+    - alert: APIGatewayHighRedisLatency
+      expr: gateway_redis_operation_duration_seconds{quantile="0.95"} > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: api-gateway
+      annotations:
+        summary: "API Gateway high Redis latency"
+        description: "Redis operation p95 latency is {{ $value }}s, threshold is 100ms"

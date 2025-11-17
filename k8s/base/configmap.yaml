@@ -1,0 +1,151 @@
+---
+# ConfigMap for non-sensitive configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  labels:
+    app: api-gateway
+    component: gateway
+data:
+  # Server configuration
+  GATEWAY_HOST: "0.0.0.0"
+  GATEWAY_PORT: "8080"
+
+  # Logging configuration
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+
+  # Redis configuration
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  REDIS_MAX_CONNECTIONS: "50"
+
+  # Session configuration
+  SESSION_COOKIE_NAME: "session_token"
+  SESSION_COOKIE_SECURE: "true"
+  SESSION_COOKIE_HTTPONLY: "true"
+  SESSION_COOKIE_SAMESITE: "Lax"
+  SESSION_TTL: "3600"
+
+  # Rate limiting configuration
+  RATELIMIT_ENABLED: "true"
+  RATELIMIT_FAIL_OPEN: "false"
+
+  # Upstream configuration
+  UPSTREAM_TIMEOUT: "30"
+  UPSTREAM_CONNECT_TIMEOUT: "5"
+
+  # Observability
+  METRICS_ENABLED: "true"
+  METRICS_PATH: "/metrics"
+
+---
+# ConfigMap for gateway configuration files
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config-files
+  labels:
+    app: api-gateway
+    component: gateway
+data:
+  gateway.yml: |
+    server:
+      host: 0.0.0.0
+      port: 8080
+      workers: 4
+      keepalive_timeout: 65
+      max_connections: 1000
+
+    logging:
+      level: INFO
+      format: json
+      outputs:
+        - type: stdout
+
+    routes:
+      - path: /api/v1/users
+        methods: [GET, POST]
+        upstream: http://user-service:8080
+        auth_required: true
+        permissions: [read:users]
+        ratelimit:
+          requests: 100
+          window: 60
+
+      - path: /api/v1/users/{user_id}
+        methods: [GET, PUT, DELETE]
+        upstream: http://user-service:8080
+        auth_required: true
+        permissions: [read:users, write:users]
+        ratelimit:
+          requests: 50
+          window: 60
+
+      - path: /api/v1/posts
+        methods: [GET, POST]
+        upstream: http://post-service:8080
+        auth_required: true
+        permissions: [read:posts]
+        ratelimit:
+          requests: 200
+          window: 60
+
+      - path: /health/live
+        methods: [GET]
+        upstream: null
+        auth_required: false
+        handler: health_live
+
+      - path: /health/ready
+        methods: [GET]
+        upstream: null
+        auth_required: false
+        handler: health_ready
+
+      - path: /metrics
+        methods: [GET]
+        upstream: null
+        auth_required: false
+        handler: metrics
+
+    redis:
+      host: redis-service
+      port: 6379
+      db: 0
+      max_connections: 50
+      socket_timeout: 5
+      socket_connect_timeout: 2
+
+    session:
+      cookie_name: session_token
+      ttl: 3600
+      refresh_threshold: 300
+      cookie_secure: true
+      cookie_httponly: true
+      cookie_samesite: Lax
+
+    ratelimit:
+      enabled: true
+      fail_open: false
+      default:
+        algorithm: token_bucket
+        requests: 100
+        window: 60
+        burst: 20
+
+    upstream:
+      timeout: 30
+      connect_timeout: 5
+      max_connections: 100
+      keepalive: true
+
+    observability:
+      metrics:
+        enabled: true
+        path: /metrics
+      health:
+        live_path: /health/live
+        ready_path: /health/ready

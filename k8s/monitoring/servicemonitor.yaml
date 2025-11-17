@@ -1,0 +1,97 @@
+---
+# ServiceMonitor for Prometheus Operator
+# Configures Prometheus to scrape metrics from the API Gateway
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: api-gateway
+  labels:
+    app: api-gateway
+    component: gateway
+    prometheus: kube-prometheus
+spec:
+  # Select services to monitor
+  selector:
+    matchLabels:
+      app: api-gateway
+
+  # Namespace selector (optional)
+  namespaceSelector:
+    matchNames:
+    - default  # Adjust to your namespace
+
+  # Endpoints to scrape
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+
+    # Relabeling configs
+    relabelings:
+    # Add namespace label
+    - sourceLabels: [__meta_kubernetes_namespace]
+      targetLabel: namespace
+      action: replace
+
+    # Add pod label
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod
+      action: replace
+
+    # Add service label
+    - sourceLabels: [__meta_kubernetes_service_name]
+      targetLabel: service
+      action: replace
+
+    # Add node label
+    - sourceLabels: [__meta_kubernetes_pod_node_name]
+      targetLabel: node
+      action: replace
+
+    # Metric relabelings
+    metricRelabelings:
+    # Drop high-cardinality metrics if needed
+    - sourceLabels: [__name__]
+      regex: 'go_.*'
+      action: drop
+
+---
+# PodMonitor for direct pod monitoring (alternative to ServiceMonitor)
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: api-gateway
+  labels:
+    app: api-gateway
+    component: gateway
+    prometheus: kube-prometheus
+spec:
+  # Select pods to monitor
+  selector:
+    matchLabels:
+      app: api-gateway
+
+  # Namespace selector
+  namespaceSelector:
+    matchNames:
+    - default  # Adjust to your namespace
+
+  # Pod metrics endpoints
+  podMetricsEndpoints:
+  - port: metrics
+    path: /metrics
+    interval: 15s
+    scrapeTimeout: 10s
+
+    # Relabelings
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_namespace]
+      targetLabel: namespace
+      action: replace
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod
+      action: replace
+    - sourceLabels: [__meta_kubernetes_pod_container_name]
+      targetLabel: container
+      action: replace
