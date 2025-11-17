@@ -375,7 +375,7 @@ class GatewayMetrics:
         Returns:
             Prometheus-formatted metrics
         """
-        return generate_latest(REGISTRY)
+        return bytes(generate_latest(REGISTRY))
 
     @staticmethod
     def _normalize_path(path: str) -> str:
