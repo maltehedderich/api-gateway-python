@@ -52,7 +52,8 @@ class TokenExtractor:
         """
         try:
             # aiohttp provides cookies as a dict-like object
-            return request.cookies.get(self.cookie_name)
+            token = request.cookies.get(self.cookie_name)
+            return str(token) if token else None
         except Exception as e:
             logger.debug(f"Failed to extract token from cookie: {e}")
             return None
@@ -71,7 +72,8 @@ class TokenExtractor:
         try:
             auth_header = request.headers.get("Authorization", "")
             if auth_header.startswith("Bearer "):
-                return auth_header[7:].strip()
+                token = auth_header[7:].strip()
+                return str(token) if token else None
             return None
         except Exception as e:
             logger.debug(f"Failed to extract token from header: {e}")

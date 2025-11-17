@@ -165,4 +165,4 @@ def create_handler_middleware(
         """
         return await request_handler.handle_request(request)
 
-    return middleware
+    return middleware  # type: ignore[no-any-return]
