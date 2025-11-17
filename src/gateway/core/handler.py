@@ -5,12 +5,13 @@ to handle incoming HTTP requests.
 """
 
 import logging
-from datetime import datetime
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 
 from aiohttp import web
 
 from gateway.core.config import GatewayConfig
-from gateway.core.middleware import MiddlewareChain, RequestContext, create_request_context
+from gateway.core.middleware import MiddlewareChain, create_request_context
 from gateway.core.routing import Router
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ class RequestHandler:
                         "error": "method_not_allowed",
                         "message": f"Method {context.method} not allowed for this path",
                         "correlation_id": context.correlation_id,
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
+                        "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                     },
                     status=405,
                     headers={**headers, "Allow": ", ".join(allowed_methods)},
@@ -79,7 +80,7 @@ class RequestHandler:
                         "error": "not_found",
                         "message": "The requested resource was not found",
                         "correlation_id": context.correlation_id,
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
+                        "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                     },
                     status=404,
                     headers=headers,
@@ -125,7 +126,7 @@ class RequestHandler:
                     "error": "internal_error",
                     "message": "An unexpected error occurred",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=500,
                 headers=headers,
@@ -134,7 +135,9 @@ class RequestHandler:
 
 def create_handler_middleware(
     router: Router, middleware_chain: MiddlewareChain, config: GatewayConfig
-) -> web.middleware:
+) -> Callable[
+    [web.Request, Callable[[web.Request], Awaitable[web.Response]]], Awaitable[web.Response]
+]:
     """Create an aiohttp middleware that uses our request handler.
 
     Args:
@@ -145,19 +148,21 @@ def create_handler_middleware(
     Returns:
         aiohttp middleware function
     """
-    handler = RequestHandler(router, middleware_chain, config)
+    request_handler = RequestHandler(router, middleware_chain, config)
 
     @web.middleware
-    async def middleware(request: web.Request, handler_func: web.Handler) -> web.Response:
+    async def middleware(
+        request: web.Request, handler: Callable[[web.Request], Awaitable[web.Response]]
+    ) -> web.Response:
         """aiohttp middleware function.
 
         Args:
             request: aiohttp Request object
-            handler_func: Next handler (ignored, we use our own chain)
+            handler: Next handler (ignored, we use our own chain)
 
         Returns:
             web.Response object
         """
-        return await handler.handle_request(request)
+        return await request_handler.handle_request(request)
 
     return middleware

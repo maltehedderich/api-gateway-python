@@ -8,15 +8,14 @@ This module implements the upstream proxying functionality including:
 - Error handling for upstream failures
 """
 
-import asyncio
 import logging
-from datetime import datetime
-from typing import Dict, Optional
-from urllib.parse import urljoin, urlparse
+from datetime import UTC, datetime
+from urllib.parse import urlparse
 
 import aiohttp
 from aiohttp import web
 
+from gateway.core.config import GatewayConfig
 from gateway.core.middleware import Middleware, MiddlewareHandler, RequestContext
 
 logger = logging.getLogger(__name__)
@@ -28,14 +27,14 @@ class UpstreamProxyClient:
     Manages connection pooling, timeouts, and request forwarding.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: GatewayConfig) -> None:
         """Initialize the upstream proxy client.
 
         Args:
             config: Gateway configuration with upstream settings
         """
         self.config = config
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create the aiohttp client session.
@@ -85,7 +84,7 @@ class UpstreamProxyClient:
         self,
         base_url: str,
         request_path: str,
-        path_params: Dict[str, str],
+        path_params: dict[str, str],
         query_string: str,
     ) -> str:
         """Construct the full upstream URL.
@@ -103,14 +102,14 @@ class UpstreamProxyClient:
         parsed = urlparse(base_url)
 
         # Combine base path with request path
-        if parsed.path and parsed.path != '/':
+        if parsed.path and parsed.path != "/":
             # Base URL has a path component
-            full_path = parsed.path.rstrip('/') + request_path
+            full_path = parsed.path.rstrip("/") + request_path
         else:
             full_path = request_path
 
         # Reconstruct the URL with scheme and netloc from base_url
-        scheme = parsed.scheme or 'http'
+        scheme = parsed.scheme or "http"
         netloc = parsed.netloc
 
         # Construct the full URL
@@ -123,12 +122,12 @@ class UpstreamProxyClient:
 
     def _prepare_upstream_headers(
         self,
-        request_headers: Dict[str, str],
+        request_headers: dict[str, str],
         upstream_url: str,
         correlation_id: str,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         client_ip: str = "unknown",
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Prepare headers for upstream request.
 
         Copies headers from original request and adds/modifies proxy-specific headers.
@@ -147,10 +146,10 @@ class UpstreamProxyClient:
 
         # Copy most headers from original request
         skip_headers = {
-            'host',  # Will be set to upstream host
-            'connection',  # Will be managed by aiohttp
-            'transfer-encoding',  # Will be managed by aiohttp
-            'content-length',  # Will be recalculated if needed
+            "host",  # Will be set to upstream host
+            "connection",  # Will be managed by aiohttp
+            "transfer-encoding",  # Will be managed by aiohttp
+            "content-length",  # Will be recalculated if needed
         }
 
         for key, value in request_headers.items():
@@ -159,27 +158,27 @@ class UpstreamProxyClient:
 
         # Set Host header to upstream service
         parsed_url = urlparse(upstream_url)
-        headers['Host'] = parsed_url.netloc
+        headers["Host"] = parsed_url.netloc
 
         # Add X-Forwarded-* headers
         # X-Forwarded-For: append client IP
-        existing_xff = request_headers.get('X-Forwarded-For', '')
+        existing_xff = request_headers.get("X-Forwarded-For", "")
         if existing_xff:
-            headers['X-Forwarded-For'] = f"{existing_xff}, {client_ip}"
+            headers["X-Forwarded-For"] = f"{existing_xff}, {client_ip}"
         else:
-            headers['X-Forwarded-For'] = client_ip
+            headers["X-Forwarded-For"] = client_ip
 
         # X-Forwarded-Proto: preserve or set based on original request
-        if 'X-Forwarded-Proto' not in headers:
+        if "X-Forwarded-Proto" not in headers:
             # Determine protocol from upstream URL
-            headers['X-Forwarded-Proto'] = parsed_url.scheme or 'http'
+            headers["X-Forwarded-Proto"] = parsed_url.scheme or "http"
 
         # X-Request-ID: correlation ID for tracing
-        headers['X-Request-ID'] = correlation_id
+        headers["X-Request-ID"] = correlation_id
 
         # X-User-ID: optionally add authenticated user ID
         if user_id:
-            headers['X-User-ID'] = user_id
+            headers["X-User-ID"] = user_id
 
         return headers
 
@@ -187,8 +186,8 @@ class UpstreamProxyClient:
         self,
         method: str,
         upstream_url: str,
-        headers: Dict[str, str],
-        body: Optional[bytes] = None,
+        headers: dict[str, str],
+        body: bytes | None = None,
         correlation_id: str = "unknown",
     ) -> aiohttp.ClientResponse:
         """Forward request to upstream service.
@@ -261,7 +260,7 @@ class ProxyMiddleware(Middleware):
     - Handle upstream errors and timeouts
     """
 
-    def __init__(self, config):
+    def __init__(self, config: GatewayConfig) -> None:
         """Initialize the proxy middleware.
 
         Args:
@@ -299,7 +298,7 @@ class ProxyMiddleware(Middleware):
                     "error": "internal_error",
                     "message": "No route match found",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=500,
             )
@@ -342,7 +341,7 @@ class ProxyMiddleware(Middleware):
 
             # Prepare response headers
             response_headers = self._prepare_response_headers(
-                upstream_response.headers,
+                dict(upstream_response.headers),
                 context,
             )
 
@@ -368,7 +367,7 @@ class ProxyMiddleware(Middleware):
 
             return response
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Upstream timeout
             logger.error(
                 "Upstream request timeout",
@@ -384,7 +383,7 @@ class ProxyMiddleware(Middleware):
                     "error": "gateway_timeout",
                     "message": "Upstream service did not respond in time",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=504,
             )
@@ -405,7 +404,7 @@ class ProxyMiddleware(Middleware):
                     "error": "bad_gateway",
                     "message": "Could not connect to upstream service",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=502,
             )
@@ -426,7 +425,7 @@ class ProxyMiddleware(Middleware):
                     "error": "bad_gateway",
                     "message": "Error communicating with upstream service",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=502,
             )
@@ -446,16 +445,16 @@ class ProxyMiddleware(Middleware):
                     "error": "internal_error",
                     "message": "An unexpected error occurred",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=500,
             )
 
     def _prepare_response_headers(
         self,
-        upstream_headers: Dict[str, str],
+        upstream_headers: dict[str, str],
         context: RequestContext,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Prepare response headers from upstream response.
 
         Args:
@@ -469,9 +468,9 @@ class ProxyMiddleware(Middleware):
 
         # Skip headers that shouldn't be forwarded or will be set by aiohttp
         skip_headers = {
-            'connection',
-            'transfer-encoding',
-            'content-encoding',  # Let aiohttp handle encoding
+            "connection",
+            "transfer-encoding",
+            "content-encoding",  # Let aiohttp handle encoding
         }
 
         # Copy headers from upstream response
@@ -481,12 +480,12 @@ class ProxyMiddleware(Middleware):
 
         # Add rate limit headers if available
         if context.rate_limit_remaining is not None:
-            headers['X-RateLimit-Remaining'] = str(context.rate_limit_remaining)
+            headers["X-RateLimit-Remaining"] = str(context.rate_limit_remaining)
 
         if context.rate_limit_reset is not None:
-            headers['X-RateLimit-Reset'] = str(context.rate_limit_reset)
+            headers["X-RateLimit-Reset"] = str(context.rate_limit_reset)
 
         # Add correlation ID for tracing
-        headers['X-Request-ID'] = context.correlation_id
+        headers["X-Request-ID"] = context.correlation_id
 
         return headers

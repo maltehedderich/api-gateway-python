@@ -7,8 +7,7 @@ This module implements:
 """
 
 import logging
-from datetime import datetime
-from typing import Optional
+from datetime import UTC, datetime
 
 from aiohttp import web
 
@@ -22,6 +21,7 @@ from gateway.core.rate_limit import (
     SlidingWindowAlgorithm,
     TokenBucketAlgorithm,
 )
+from gateway.core.server import METRICS_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -106,9 +106,7 @@ class RateLimitKeyGenerator:
         route_id = context.route_match.route.id if context.route_match else "unknown"
         return f"route:{route_id}:{rule.name}"
 
-    def _generate_composite_key(
-        self, context: RequestContext, rule: RateLimitRule
-    ) -> str:
+    def _generate_composite_key(self, context: RequestContext, rule: RateLimitRule) -> str:
         """Generate composite key based on multiple dimensions.
 
         Combines user (or IP) + route for fine-grained control.
@@ -167,12 +165,11 @@ class RateLimitEvaluator:
             Rate limiting algorithm instance
         """
         return self.algorithms.get(
-            algorithm_name, self.algorithms["token_bucket"]  # Default to token bucket
+            algorithm_name,
+            self.algorithms["token_bucket"],  # Default to token bucket
         )
 
-    async def evaluate(
-        self, context: RequestContext, rule: RateLimitRule
-    ) -> RateLimitState:
+    async def evaluate(self, context: RequestContext, rule: RateLimitRule) -> RateLimitState:
         """Evaluate rate limiting rule for a request.
 
         Args:
@@ -306,17 +303,12 @@ class RateLimitingMiddleware(Middleware):
 
         for rule in self.rules:
             # If rule has no specific routes, it applies to all
-            if not rule.routes:
-                applicable_rules.append(rule)
-            # If rule specifies routes, check if current route matches
-            elif route_id and route_id in rule.routes:
+            if not rule.routes or route_id and route_id in rule.routes:
                 applicable_rules.append(rule)
 
         return applicable_rules
 
-    def _add_rate_limit_headers(
-        self, response: web.Response, state: RateLimitState
-    ) -> None:
+    def _add_rate_limit_headers(self, response: web.Response, state: RateLimitState) -> None:
         """Add rate limit headers to response.
 
         Args:
@@ -365,9 +357,7 @@ class RateLimitingMiddleware(Middleware):
 
             # Populate context with rate limiting info (from first/most restrictive rule)
             if context.rate_limit_key is None:
-                context.rate_limit_key = self.evaluator.key_generator.generate_key(
-                    context, rule
-                )
+                context.rate_limit_key = self.evaluator.key_generator.generate_key(context, rule)
                 context.rate_limit_remaining = state.remaining
                 context.rate_limit_reset = state.reset_at
 
@@ -388,7 +378,7 @@ class RateLimitingMiddleware(Middleware):
                         "error": "rate_limit_exceeded",
                         "message": "Too many requests, please try again later",
                         "correlation_id": context.correlation_id,
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
+                        "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                     },
                     status=429,
                 )
@@ -396,7 +386,7 @@ class RateLimitingMiddleware(Middleware):
                 self._add_rate_limit_headers(response, state)
 
                 # Update metrics if available
-                metrics = request.app.get("metrics")
+                metrics = request.app.get(METRICS_KEY)
                 if metrics:
                     metrics.record_rate_limit_exceeded(rule.name, rule.key_type)
 

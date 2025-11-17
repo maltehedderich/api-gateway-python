@@ -8,7 +8,7 @@ This module handles loading and validating configuration from multiple sources:
 
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
@@ -20,19 +20,15 @@ class ServerConfig(BaseModel):
     host: str = Field(default="0.0.0.0", description="Server bind address")
     port: int = Field(default=8080, ge=1, le=65535, description="Server port")
     tls_enabled: bool = Field(default=False, description="Enable TLS/HTTPS")
-    tls_cert_path: Optional[str] = Field(default=None, description="Path to TLS certificate")
-    tls_key_path: Optional[str] = Field(default=None, description="Path to TLS private key")
+    tls_cert_path: str | None = Field(default=None, description="Path to TLS certificate")
+    tls_key_path: str | None = Field(default=None, description="Path to TLS private key")
     connection_timeout: int = Field(default=60, ge=1, description="Connection timeout in seconds")
-    keepalive_timeout: int = Field(
-        default=75, ge=1, description="Keep-alive timeout in seconds"
-    )
-    max_connections: int = Field(
-        default=1000, ge=1, description="Maximum concurrent connections"
-    )
+    keepalive_timeout: int = Field(default=75, ge=1, description="Keep-alive timeout in seconds")
+    max_connections: int = Field(default=1000, ge=1, description="Maximum concurrent connections")
 
     @field_validator("tls_cert_path", "tls_key_path")
     @classmethod
-    def validate_tls_paths(cls, v: Optional[str], info: Any) -> Optional[str]:
+    def validate_tls_paths(cls, v: str | None, info: Any) -> str | None:
         """Validate TLS certificate and key paths exist if TLS is enabled."""
         if v is not None and not Path(v).exists():
             raise ValueError(f"TLS file not found: {v}")
@@ -44,10 +40,10 @@ class RouteConfig(BaseModel):
 
     id: str = Field(description="Unique route identifier")
     path_pattern: str = Field(description="URL path pattern")
-    methods: List[str] = Field(description="Allowed HTTP methods")
+    methods: list[str] = Field(description="Allowed HTTP methods")
     upstream_url: str = Field(description="Backend service URL")
     auth_required: bool = Field(default=True, description="Whether authentication is required")
-    auth_roles: List[str] = Field(
+    auth_roles: list[str] = Field(
         default_factory=list, description="Required roles for authorization"
     )
     timeout: int = Field(default=30, ge=1, description="Request timeout in seconds")
@@ -62,7 +58,7 @@ class LoggingConfig(BaseModel):
     correlation_id_header: str = Field(
         default="X-Request-ID", description="Header name for correlation ID"
     )
-    redact_headers: List[str] = Field(
+    redact_headers: list[str] = Field(
         default_factory=lambda: ["Authorization", "Cookie", "Set-Cookie"],
         description="Headers to redact from logs",
     )
@@ -85,28 +81,22 @@ class SessionConfig(BaseModel):
     session_store_url: str = Field(
         default="redis://localhost:6379/0", description="Session store connection URL"
     )
-    token_signing_secret: Optional[str] = Field(
-        default=None, description="Secret for signing tokens"
-    )
+    token_signing_secret: str | None = Field(default=None, description="Secret for signing tokens")
     token_ttl: int = Field(default=3600, ge=60, description="Token TTL in seconds")
     refresh_enabled: bool = Field(default=True, description="Enable token refresh")
-    refresh_threshold: int = Field(
-        default=300, ge=0, description="Refresh threshold in seconds"
-    )
+    refresh_threshold: int = Field(default=300, ge=0, description="Refresh threshold in seconds")
 
 
 class RateLimitRule(BaseModel):
     """Rate limiting rule configuration."""
 
     name: str = Field(description="Rule name")
-    key_type: str = Field(
-        default="user", description="Key type (ip, user, route, composite)"
-    )
+    key_type: str = Field(default="user", description="Key type (ip, user, route, composite)")
     algorithm: str = Field(default="token_bucket", description="Rate limiting algorithm")
     limit: int = Field(ge=1, description="Request limit")
     window: int = Field(ge=1, description="Time window in seconds")
-    burst: Optional[int] = Field(default=None, ge=1, description="Burst allowance")
-    routes: List[str] = Field(
+    burst: int | None = Field(default=None, ge=1, description="Burst allowance")
+    routes: list[str] = Field(
         default_factory=list, description="Routes this rule applies to (empty = all)"
     )
 
@@ -139,7 +129,7 @@ class RateLimitConfig(BaseModel):
     fail_mode: str = Field(
         default="open", description="Fail mode (open or closed) when store unavailable"
     )
-    rules: List[RateLimitRule] = Field(default_factory=list, description="Rate limiting rules")
+    rules: list[RateLimitRule] = Field(default_factory=list, description="Rate limiting rules")
 
     @field_validator("fail_mode")
     @classmethod
@@ -168,9 +158,7 @@ class MetricsConfig(BaseModel):
     endpoint: str = Field(default="/metrics", description="Metrics endpoint path")
     health_endpoint: str = Field(default="/health", description="Health check endpoint path")
     liveness_endpoint: str = Field(default="/health/live", description="Liveness endpoint path")
-    readiness_endpoint: str = Field(
-        default="/health/ready", description="Readiness endpoint path"
-    )
+    readiness_endpoint: str = Field(default="/health/ready", description="Readiness endpoint path")
 
 
 class GatewayConfig(BaseModel):
@@ -178,7 +166,7 @@ class GatewayConfig(BaseModel):
 
     environment: str = Field(default="development", description="Environment name")
     server: ServerConfig = Field(default_factory=ServerConfig)
-    routes: List[RouteConfig] = Field(default_factory=list)
+    routes: list[RouteConfig] = Field(default_factory=list)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     session: SessionConfig = Field(default_factory=SessionConfig)
     rate_limiting: RateLimitConfig = Field(default_factory=RateLimitConfig)
@@ -189,7 +177,7 @@ class GatewayConfig(BaseModel):
 class ConfigLoader:
     """Loads and validates configuration from multiple sources."""
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None):
         """Initialize the configuration loader.
 
         Args:
@@ -198,7 +186,7 @@ class ConfigLoader:
         """
         self.config_path = self._resolve_config_path(config_path)
 
-    def _resolve_config_path(self, config_path: Optional[str]) -> Path:
+    def _resolve_config_path(self, config_path: str | None) -> Path:
         """Resolve configuration file path."""
         if config_path:
             return Path(config_path)
@@ -239,18 +227,18 @@ class ConfigLoader:
 
         return config
 
-    def _load_from_file(self) -> Dict[str, Any]:
+    def _load_from_file(self) -> dict[str, Any]:
         """Load configuration from YAML file."""
         if not self.config_path.exists():
             # Return empty dict if file doesn't exist, will use defaults
             return {}
 
-        with open(self.config_path, "r") as f:
+        with open(self.config_path) as f:
             config_dict = yaml.safe_load(f) or {}
 
         return config_dict
 
-    def _override_from_env(self, config_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def _override_from_env(self, config_dict: dict[str, Any]) -> dict[str, Any]:
         """Override configuration with environment variables.
 
         Environment variables follow the pattern: GATEWAY_<SECTION>_<KEY>
@@ -289,7 +277,7 @@ class ConfigLoader:
         return config_dict
 
 
-def load_config(config_path: Optional[str] = None) -> GatewayConfig:
+def load_config(config_path: str | None = None) -> GatewayConfig:
     """Load configuration (convenience function).
 
     Args:

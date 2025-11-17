@@ -13,9 +13,8 @@ import hashlib
 import hmac
 import json
 import logging
-import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from aiohttp import web
 
@@ -42,7 +41,7 @@ class TokenExtractor:
         """
         self.cookie_name = cookie_name
 
-    def extract_from_cookie(self, request: web.Request) -> Optional[str]:
+    def extract_from_cookie(self, request: web.Request) -> str | None:
         """Extract token from Cookie header.
 
         Args:
@@ -58,7 +57,7 @@ class TokenExtractor:
             logger.debug(f"Failed to extract token from cookie: {e}")
             return None
 
-    def extract_from_header(self, request: web.Request) -> Optional[str]:
+    def extract_from_header(self, request: web.Request) -> str | None:
         """Extract token from Authorization header.
 
         Supports "Bearer <token>" format.
@@ -78,7 +77,7 @@ class TokenExtractor:
             logger.debug(f"Failed to extract token from header: {e}")
             return None
 
-    def extract(self, request: web.Request) -> Optional[str]:
+    def extract(self, request: web.Request) -> str | None:
         """Extract token from request (tries cookie first, then header).
 
         Args:
@@ -107,7 +106,7 @@ class TokenValidator:
     def __init__(
         self,
         session_store: SessionStore,
-        signing_secret: Optional[str] = None,
+        signing_secret: str | None = None,
         use_signed_tokens: bool = False,
     ):
         """Initialize token validator.
@@ -124,7 +123,7 @@ class TokenValidator:
         if use_signed_tokens and not signing_secret:
             raise ValueError("signing_secret is required when use_signed_tokens=True")
 
-    def _verify_signature(self, token: str) -> Optional[dict]:
+    def _verify_signature(self, token: str) -> dict[str, Any] | None:
         """Verify signed token signature and extract payload.
 
         Token format: <payload_base64>.<signature_base64>
@@ -136,6 +135,10 @@ class TokenValidator:
             Payload dict if signature is valid, None otherwise
         """
         try:
+            if not self.signing_secret:
+                logger.error("Cannot verify signature: signing_secret is None")
+                return None
+
             parts = token.split(".")
             if len(parts) != 2:
                 logger.debug("Invalid token format: expected 2 parts")
@@ -145,9 +148,7 @@ class TokenValidator:
 
             # Verify signature
             expected_signature = hmac.new(
-                self.signing_secret.encode(),
-                payload_b64.encode(),
-                hashlib.sha256
+                self.signing_secret.encode(), payload_b64.encode(), hashlib.sha256
             ).hexdigest()
 
             if not hmac.compare_digest(signature_b64, expected_signature):
@@ -156,8 +157,9 @@ class TokenValidator:
 
             # Decode payload
             import base64
+
             payload_json = base64.b64decode(payload_b64).decode()
-            payload = json.loads(payload_json)
+            payload: dict[str, Any] = json.loads(payload_json)
 
             return payload
 
@@ -165,7 +167,7 @@ class TokenValidator:
             logger.warning(f"Failed to verify token signature: {e}")
             return None
 
-    async def validate_opaque_token(self, token: str) -> Optional[SessionData]:
+    async def validate_opaque_token(self, token: str) -> SessionData | None:
         """Validate opaque token by looking it up in session store.
 
         Args:
@@ -202,7 +204,7 @@ class TokenValidator:
             logger.error(f"Failed to validate opaque token: {e}")
             return None
 
-    async def validate_signed_token(self, token: str) -> Optional[SessionData]:
+    async def validate_signed_token(self, token: str) -> SessionData | None:
         """Validate signed token by verifying signature and checking claims.
 
         Args:
@@ -224,7 +226,7 @@ class TokenValidator:
                 return None
 
             exp_dt = datetime.fromisoformat(exp)
-            if datetime.utcnow() >= exp_dt:
+            if datetime.now(UTC) >= exp_dt:
                 logger.info("Token is expired")
                 return None
 
@@ -232,7 +234,7 @@ class TokenValidator:
             nbf = payload.get("nbf")
             if nbf:
                 nbf_dt = datetime.fromisoformat(nbf)
-                if datetime.utcnow() < nbf_dt:
+                if datetime.now(UTC) < nbf_dt:
                     logger.info("Token not yet valid (nbf)")
                     return None
 
@@ -247,8 +249,10 @@ class TokenValidator:
                 session_id=payload.get("session_id", ""),
                 user_id=payload.get("user_id", ""),
                 username=payload.get("username", ""),
-                created_at=datetime.fromisoformat(payload.get("iat", datetime.utcnow().isoformat())),
-                last_accessed_at=datetime.utcnow(),
+                created_at=datetime.fromisoformat(
+                    payload.get("iat", datetime.now(UTC).isoformat())
+                ),
+                last_accessed_at=datetime.now(UTC),
                 expires_at=exp_dt,
                 revoked=False,
                 roles=payload.get("roles", []),
@@ -264,7 +268,7 @@ class TokenValidator:
             logger.error(f"Failed to validate signed token: {e}")
             return None
 
-    async def validate(self, token: str) -> Optional[SessionData]:
+    async def validate(self, token: str) -> SessionData | None:
         """Validate token (dispatches to appropriate validator).
 
         Args:
@@ -287,7 +291,7 @@ class TokenRefresher:
         session_store: SessionStore,
         refresh_threshold: int = 300,
         token_ttl: int = 3600,
-        signing_secret: Optional[str] = None,
+        signing_secret: str | None = None,
         use_signed_tokens: bool = False,
     ):
         """Initialize token refresher.
@@ -314,10 +318,10 @@ class TokenRefresher:
         Returns:
             True if session should be refreshed, False otherwise
         """
-        time_until_expiry = (session_data.expires_at - datetime.utcnow()).total_seconds()
+        time_until_expiry = (session_data.expires_at - datetime.now(UTC)).total_seconds()
         return time_until_expiry < self.refresh_threshold
 
-    async def refresh(self, session_data: SessionData) -> tuple[SessionData, Optional[str]]:
+    async def refresh(self, session_data: SessionData) -> tuple[SessionData, str | None]:
         """Refresh session and generate new token if needed.
 
         Args:
@@ -331,8 +335,8 @@ class TokenRefresher:
 
         try:
             # Update session expiration
-            session_data.expires_at = datetime.utcnow() + timedelta(seconds=self.token_ttl)
-            session_data.last_accessed_at = datetime.utcnow()
+            session_data.expires_at = datetime.now(UTC) + timedelta(seconds=self.token_ttl)
+            session_data.last_accessed_at = datetime.now(UTC)
 
             # Update in store
             await self.session_store.update(session_data)
@@ -363,6 +367,9 @@ class TokenRefresher:
         """
         import base64
 
+        if not self.signing_secret:
+            raise RuntimeError("Cannot generate signed token: signing_secret is None")
+
         # Build payload
         payload = {
             "session_id": session_data.session_id,
@@ -383,9 +390,7 @@ class TokenRefresher:
 
         # Generate signature
         signature = hmac.new(
-            self.signing_secret.encode(),
-            payload_b64.encode(),
-            hashlib.sha256
+            self.signing_secret.encode(), payload_b64.encode(), hashlib.sha256
         ).hexdigest()
 
         # Combine into token
@@ -410,7 +415,7 @@ class Authorizer:
             return True
 
         # Check if user has any of the required roles
-        user_roles = set(session_data.roles)
+        user_roles = set(session_data.roles or [])
         required = set(required_roles)
 
         return bool(user_roles & required)
@@ -453,13 +458,17 @@ class AuthenticationMiddleware(Middleware):
             use_signed_tokens=use_signed_tokens,
         )
 
-        self.refresher = TokenRefresher(
-            session_store=session_store,
-            refresh_threshold=config.session.refresh_threshold,
-            token_ttl=config.session.token_ttl,
-            signing_secret=config.session.token_signing_secret,
-            use_signed_tokens=use_signed_tokens,
-        ) if config.session.refresh_enabled else None
+        self.refresher = (
+            TokenRefresher(
+                session_store=session_store,
+                refresh_threshold=config.session.refresh_threshold,
+                token_ttl=config.session.token_ttl,
+                signing_secret=config.session.token_signing_secret,
+                use_signed_tokens=use_signed_tokens,
+            )
+            if config.session.refresh_enabled
+            else None
+        )
 
         self.authorizer = Authorizer()
 
@@ -492,18 +501,18 @@ class AuthenticationMiddleware(Middleware):
 
         if not token:
             logger.info(
-                f"Authentication required but no token provided",
+                "Authentication required but no token provided",
                 extra={
                     "correlation_id": context.correlation_id,
                     "path": context.path,
-                }
+                },
             )
             return web.json_response(
                 {
                     "error": "invalid_token",
                     "message": "Authentication required",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=401,
                 headers={"WWW-Authenticate": "Bearer"},
@@ -514,18 +523,18 @@ class AuthenticationMiddleware(Middleware):
 
         if not session_data:
             logger.info(
-                f"Invalid or expired token",
+                "Invalid or expired token",
                 extra={
                     "correlation_id": context.correlation_id,
                     "path": context.path,
-                }
+                },
             )
             return web.json_response(
                 {
                     "error": "invalid_token",
                     "message": "Session token is invalid or expired",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=401,
                 headers={"WWW-Authenticate": "Bearer"},
@@ -534,8 +543,8 @@ class AuthenticationMiddleware(Middleware):
         # Populate context with user information
         context.user_id = session_data.user_id
         context.session_id = session_data.session_id
-        context.roles = session_data.roles
-        context.permissions = session_data.permissions
+        context.roles = session_data.roles or []
+        context.permissions = session_data.permissions or []
         context.authenticated = True
 
         # Check authorization
@@ -547,14 +556,14 @@ class AuthenticationMiddleware(Middleware):
                     "user_id": session_data.user_id,
                     "required_roles": route.auth_roles,
                     "user_roles": session_data.roles,
-                }
+                },
             )
             return web.json_response(
                 {
                     "error": "forbidden",
                     "message": "Access denied",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=403,
             )

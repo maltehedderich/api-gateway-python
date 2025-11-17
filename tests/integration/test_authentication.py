@@ -1,10 +1,11 @@
 """Integration tests for authentication and authorization."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from aiohttp.test_utils import TestClient
-from datetime import datetime, timedelta
 
-from gateway.core.session_store import SessionData, InMemorySessionStore
+from gateway.core.session_store import InMemorySessionStore, SessionData
 
 
 class TestAuthentication:
@@ -26,9 +27,7 @@ class TestAuthentication:
     ):
         """Test accessing protected route with valid session token."""
         # Set session cookie
-        gateway_client.session.cookie_jar.update_cookies(
-            {"session_token": test_session.session_id}
-        )
+        gateway_client.session.cookie_jar.update_cookies({"session_token": test_session.session_id})
 
         response = await gateway_client.get("/api/users/123")
 
@@ -53,7 +52,7 @@ class TestAuthentication:
     ):
         """Test accessing protected route with expired session token."""
         # Create expired session
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         expired_session = SessionData(
             session_id="expired-session",
             user_id="user-999",
@@ -79,16 +78,14 @@ class TestAuthentication:
     async def test_protected_route_with_revoked_token(
         self,
         gateway_client: TestClient,
-        session_store: InMemorySessionStore,
+        gateway,
         test_session: SessionData,
     ):
         """Test accessing protected route with revoked session token."""
         # Revoke the session
-        await session_store.revoke(test_session.session_id)
+        await gateway.session_store.revoke(test_session.session_id)
 
-        gateway_client.session.cookie_jar.update_cookies(
-            {"session_token": test_session.session_id}
-        )
+        gateway_client.session.cookie_jar.update_cookies({"session_token": test_session.session_id})
 
         response = await gateway_client.get("/api/users/123")
 
@@ -97,9 +94,7 @@ class TestAuthentication:
         assert data["error"] == "invalid_token"
 
     @pytest.mark.asyncio
-    async def test_protected_route_with_invalid_token_format(
-        self, gateway_client: TestClient
-    ):
+    async def test_protected_route_with_invalid_token_format(self, gateway_client: TestClient):
         """Test accessing protected route with malformed token."""
         gateway_client.session.cookie_jar.update_cookies({"session_token": "invalid-token-format"})
 
@@ -122,9 +117,7 @@ class TestAuthentication:
         self, gateway_client: TestClient, test_session: SessionData
     ):
         """Test that public routes accept but don't require authentication."""
-        gateway_client.session.cookie_jar.update_cookies(
-            {"session_token": test_session.session_id}
-        )
+        gateway_client.session.cookie_jar.update_cookies({"session_token": test_session.session_id})
 
         response = await gateway_client.get("/api/hello")
 
@@ -141,9 +134,7 @@ class TestAuthorization:
     ):
         """Test accessing route when user has required role."""
         # test_session has "user" role, which is required for /api/users
-        gateway_client.session.cookie_jar.update_cookies(
-            {"session_token": test_session.session_id}
-        )
+        gateway_client.session.cookie_jar.update_cookies({"session_token": test_session.session_id})
 
         response = await gateway_client.get("/api/users/123")
 
@@ -155,9 +146,7 @@ class TestAuthorization:
     ):
         """Test accessing route when user lacks required role."""
         # test_session has "user" role, but /api/admin requires "admin" role
-        gateway_client.session.cookie_jar.update_cookies(
-            {"session_token": test_session.session_id}
-        )
+        gateway_client.session.cookie_jar.update_cookies({"session_token": test_session.session_id})
 
         response = await gateway_client.get("/api/admin")
 
@@ -196,9 +185,7 @@ class TestAuthorization:
         assert response.status == 200
 
     @pytest.mark.asyncio
-    async def test_authorization_without_authentication(
-        self, gateway_client: TestClient
-    ):
+    async def test_authorization_without_authentication(self, gateway_client: TestClient):
         """Test that authorization check requires authentication first."""
         # Try to access protected route without token
         response = await gateway_client.get("/api/users/123")
@@ -225,9 +212,7 @@ class TestSessionLifecycle:
 
         await asyncio.sleep(0.1)
 
-        gateway_client.session.cookie_jar.update_cookies(
-            {"session_token": test_session.session_id}
-        )
+        gateway_client.session.cookie_jar.update_cookies({"session_token": test_session.session_id})
 
         response = await gateway_client.get("/api/users/123")
         assert response.status == 200
@@ -241,11 +226,11 @@ class TestSessionLifecycle:
     async def test_session_refresh_near_expiration(
         self,
         gateway_client: TestClient,
-        session_store: InMemorySessionStore,
+        gateway,
     ):
         """Test session token refresh when approaching expiration."""
         # Create session that's near expiration
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         near_expiration_session = SessionData(
             session_id="near-expiry-session",
             user_id="user-888",
@@ -255,7 +240,7 @@ class TestSessionLifecycle:
             expires_at=now + timedelta(minutes=2),  # Expires soon
             roles=["user"],
         )
-        await session_store.create(near_expiration_session)
+        await gateway.session_store.create(near_expiration_session)
 
         gateway_client.session.cookie_jar.update_cookies(
             {"session_token": near_expiration_session.session_id}
@@ -277,9 +262,7 @@ class TestAuthenticationLogging:
         self, gateway_client: TestClient, test_session: SessionData, caplog
     ):
         """Test that successful authentication is logged."""
-        gateway_client.session.cookie_jar.update_cookies(
-            {"session_token": test_session.session_id}
-        )
+        gateway_client.session.cookie_jar.update_cookies({"session_token": test_session.session_id})
 
         with caplog.at_level("INFO"):
             response = await gateway_client.get("/api/users/123")
@@ -303,9 +286,7 @@ class TestAuthenticationLogging:
         self, gateway_client: TestClient, test_session: SessionData, caplog
     ):
         """Test that authorization denials are logged."""
-        gateway_client.session.cookie_jar.update_cookies(
-            {"session_token": test_session.session_id}
-        )
+        gateway_client.session.cookie_jar.update_cookies({"session_token": test_session.session_id})
 
         with caplog.at_level("WARNING"):
             response = await gateway_client.get("/api/admin")
@@ -322,9 +303,7 @@ class TestUserContext:
         self, gateway_client: TestClient, test_session: SessionData
     ):
         """Test that user ID is forwarded to upstream in headers."""
-        gateway_client.session.cookie_jar.update_cookies(
-            {"session_token": test_session.session_id}
-        )
+        gateway_client.session.cookie_jar.update_cookies({"session_token": test_session.session_id})
 
         response = await gateway_client.post("/api/echo", json={})
 
@@ -340,9 +319,7 @@ class TestUserContext:
         self, gateway_client: TestClient, test_session: SessionData
     ):
         """Test that user roles are available in request context."""
-        gateway_client.session.cookie_jar.update_cookies(
-            {"session_token": test_session.session_id}
-        )
+        gateway_client.session.cookie_jar.update_cookies({"session_token": test_session.session_id})
 
         response = await gateway_client.get("/api/users/123")
 

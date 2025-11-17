@@ -1,7 +1,8 @@
 """Unit tests for session store module."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timedelta
 
 from gateway.core.session_store import InMemorySessionStore, SessionData
 
@@ -11,7 +12,7 @@ class TestSessionData:
 
     def test_session_data_creation(self):
         """Test creating session data."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
 
         session = SessionData(
@@ -34,7 +35,7 @@ class TestSessionData:
 
     def test_is_expired(self):
         """Test session expiration check."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # Not expired
         session = SessionData(
@@ -60,7 +61,7 @@ class TestSessionData:
 
     def test_is_valid(self):
         """Test session validity check."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # Valid session
         valid_session = SessionData(
@@ -87,7 +88,7 @@ class TestSessionData:
 
     def test_to_dict_and_from_dict(self):
         """Test serialization and deserialization."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         expires_at = now + timedelta(hours=1)
 
         session = SessionData(
@@ -129,7 +130,7 @@ class TestInMemorySessionStore:
     @pytest.fixture
     def sample_session(self):
         """Create sample session data."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         return SessionData(
             session_id="sess-123",
             user_id="user-456",
@@ -199,7 +200,7 @@ class TestInMemorySessionStore:
 
     async def test_revoke_all_user_sessions(self, store):
         """Test revoking all sessions for a user."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         user_id = "user-123"
 
         # Create multiple sessions for same user
@@ -233,7 +234,7 @@ class TestInMemorySessionStore:
 
     async def test_cleanup_expired(self, store):
         """Test cleaning up expired sessions."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         # Create expired session
         expired_session = SessionData(
@@ -270,7 +271,7 @@ class TestInMemorySessionStore:
 
     async def test_get_expired_session_returns_none(self, store):
         """Test that getting an expired session returns None."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         expired_session = SessionData(
             session_id="sess-expired",

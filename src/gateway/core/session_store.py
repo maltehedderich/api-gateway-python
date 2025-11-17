@@ -7,12 +7,13 @@ This module provides:
 - Revocation list management
 """
 
+import contextlib
 import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import redis.asyncio as redis
 
@@ -33,11 +34,11 @@ class SessionData:
     last_accessed_at: datetime
     expires_at: datetime
     revoked: bool = False
-    roles: List[str] = None
-    permissions: List[str] = None
-    ip_address: Optional[str] = None
-    device_fingerprint: Optional[str] = None
-    metadata: Dict[str, Any] = None
+    roles: list[str] | None = None
+    permissions: list[str] | None = None
+    ip_address: str | None = None
+    device_fingerprint: str | None = None
+    metadata: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         """Initialize default values for mutable fields."""
@@ -54,7 +55,7 @@ class SessionData:
         Returns:
             True if session is expired, False otherwise
         """
-        return datetime.utcnow() >= self.expires_at
+        return datetime.now(UTC) >= self.expires_at
 
     def is_valid(self) -> bool:
         """Check if session is valid (not expired and not revoked).
@@ -64,7 +65,7 @@ class SessionData:
         """
         return not self.is_expired() and not self.revoked
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert session data to dictionary.
 
         Returns:
@@ -78,7 +79,7 @@ class SessionData:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SessionData":
+    def from_dict(cls, data: dict[str, Any]) -> "SessionData":
         """Create session data from dictionary.
 
         Args:
@@ -98,6 +99,16 @@ class SessionStore(ABC):
     """Abstract base class for session storage."""
 
     @abstractmethod
+    async def connect(self) -> None:
+        """Connect to the session store."""
+        pass
+
+    @abstractmethod
+    async def disconnect(self) -> None:
+        """Disconnect from the session store."""
+        pass
+
+    @abstractmethod
     async def create(self, session_data: SessionData) -> bool:
         """Create a new session.
 
@@ -110,7 +121,7 @@ class SessionStore(ABC):
         pass
 
     @abstractmethod
-    async def get(self, session_id: str) -> Optional[SessionData]:
+    async def get(self, session_id: str) -> SessionData | None:
         """Retrieve session by ID.
 
         Args:
@@ -203,16 +214,14 @@ class RedisSessionStore(SessionStore):
         """
         self.redis_url = redis_url
         self.key_prefix = key_prefix
-        self.client: Optional[redis.Redis] = None
+        self.client: redis.Redis | None = None
         self.revocation_key_prefix = "revoked:"
 
     async def connect(self) -> None:
         """Connect to Redis."""
         if self.client is None:
             self.client = await redis.from_url(
-                self.redis_url,
-                encoding="utf-8",
-                decode_responses=True
+                self.redis_url, encoding="utf-8", decode_responses=True
             )
             logger.info(f"Connected to Redis session store at {self.redis_url}")
 
@@ -270,7 +279,7 @@ class RedisSessionStore(SessionStore):
 
         try:
             # Calculate TTL in seconds
-            ttl = int((session_data.expires_at - datetime.utcnow()).total_seconds())
+            ttl = int((session_data.expires_at - datetime.now(UTC)).total_seconds())
             if ttl <= 0:
                 logger.warning(f"Session {session_data.session_id} already expired, not creating")
                 return False
@@ -284,17 +293,23 @@ class RedisSessionStore(SessionStore):
 
             # Add to user sessions set
             user_sessions_key = self._user_sessions_key(session_data.user_id)
-            await self.client.sadd(user_sessions_key, session_data.session_id)
-            await self.client.expire(user_sessions_key, ttl)
+            result = self.client.sadd(user_sessions_key, session_data.session_id)
+            if hasattr(result, "__await__"):
+                await result
+            expire_result = self.client.expire(user_sessions_key, ttl)
+            if hasattr(expire_result, "__await__"):
+                await expire_result
 
-            logger.debug(f"Created session {session_data.session_id} for user {session_data.user_id}")
+            logger.debug(
+                f"Created session {session_data.session_id} for user {session_data.user_id}"
+            )
             return True
 
         except Exception as e:
             logger.error(f"Failed to create session {session_data.session_id}: {e}")
             return False
 
-    async def get(self, session_id: str) -> Optional[SessionData]:
+    async def get(self, session_id: str) -> SessionData | None:
         """Retrieve session from Redis.
 
         Args:
@@ -349,7 +364,7 @@ class RedisSessionStore(SessionStore):
                 return False
 
             # Calculate remaining TTL
-            ttl = int((session_data.expires_at - datetime.utcnow()).total_seconds())
+            ttl = int((session_data.expires_at - datetime.now(UTC)).total_seconds())
             if ttl <= 0:
                 await self.delete(session_data.session_id)
                 return False
@@ -388,7 +403,9 @@ class RedisSessionStore(SessionStore):
             # Remove from user sessions set if we found the session
             if session_data:
                 user_sessions_key = self._user_sessions_key(session_data.user_id)
-                await self.client.srem(user_sessions_key, session_id)
+                srem_result = self.client.srem(user_sessions_key, session_id)
+                if hasattr(srem_result, "__await__"):
+                    await srem_result
 
             # Delete revocation key if exists
             revocation_key = self._revocation_key(session_id)
@@ -426,7 +443,7 @@ class RedisSessionStore(SessionStore):
             await self.update(session_data)
 
             # Add to revocation set with TTL matching session expiration
-            ttl = int((session_data.expires_at - datetime.utcnow()).total_seconds())
+            ttl = int((session_data.expires_at - datetime.now(UTC)).total_seconds())
             if ttl > 0:
                 revocation_key = self._revocation_key(session_id)
                 await self.client.set(revocation_key, "1", ex=ttl)
@@ -453,7 +470,11 @@ class RedisSessionStore(SessionStore):
         try:
             # Get all session IDs for user
             user_sessions_key = self._user_sessions_key(user_id)
-            session_ids = await self.client.smembers(user_sessions_key)
+            smembers_result = self.client.smembers(user_sessions_key)
+            if hasattr(smembers_result, "__await__"):
+                session_ids = await smembers_result
+            else:
+                session_ids = smembers_result
 
             count = 0
             for session_id in session_ids:
@@ -513,8 +534,8 @@ class InMemorySessionStore(SessionStore):
 
     def __init__(self) -> None:
         """Initialize in-memory session store."""
-        self.sessions: Dict[str, SessionData] = {}
-        self.user_sessions: Dict[str, List[str]] = {}
+        self.sessions: dict[str, SessionData] = {}
+        self.user_sessions: dict[str, list[str]] = {}
         self.revoked: set[str] = set()
 
     async def connect(self) -> None:
@@ -545,7 +566,7 @@ class InMemorySessionStore(SessionStore):
 
         return True
 
-    async def get(self, session_id: str) -> Optional[SessionData]:
+    async def get(self, session_id: str) -> SessionData | None:
         """Retrieve session.
 
         Args:
@@ -587,13 +608,10 @@ class InMemorySessionStore(SessionStore):
         """
         session_data = self.sessions.pop(session_id, None)
 
-        if session_data:
-            # Remove from user sessions
-            if session_data.user_id in self.user_sessions:
-                try:
-                    self.user_sessions[session_data.user_id].remove(session_id)
-                except ValueError:
-                    pass
+        # Remove from user sessions
+        if session_data and session_data.user_id in self.user_sessions:
+            with contextlib.suppress(ValueError):
+                self.user_sessions[session_data.user_id].remove(session_id)
 
         self.revoked.discard(session_id)
         return True

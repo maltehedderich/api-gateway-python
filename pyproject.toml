@@ -1,48 +1,68 @@
-[tool.poetry]
+[project]
 name = "api-gateway"
 version = "0.1.0"
 description = "Python-based API Gateway with request logging, OAuth2 session-based authorization, and rate limiting"
-authors = ["API Gateway Team"]
+authors = [{name = "API Gateway Team"}]
 readme = "README.md"
-packages = [{include = "gateway", from = "src"}]
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.9.0",
+    "pyyaml>=6.0",
+    "pydantic>=2.5.0",
+    "prometheus-client>=0.19.0",
+    "redis[hiredis]>=5.0.1",
+    "python-dotenv>=1.0.0",
+    "cryptography>=41.0.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-aiohttp = "^3.9.0"
-pyyaml = "^6.0"
-pydantic = "^2.5.0"
-prometheus-client = "^0.19.0"
-redis = {extras = ["hiredis"], version = "^5.0.1"}
-python-dotenv = "^1.0.0"
-cryptography = "^41.0.0"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.4.3"
-pytest-asyncio = "^0.21.1"
-pytest-cov = "^4.1.0"
-black = "^23.12.0"
-flake8 = "^6.1.0"
-mypy = "^1.7.1"
-isort = "^5.13.0"
-httpx = "^0.25.2"
-locust = "^2.17.0"
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.3",
+    "pytest-asyncio>=0.21.1",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.8.0",
+    "mypy>=1.7.1",
+    "httpx>=0.25.2",
+    "locust>=2.17.0",
+    "types-PyYAML>=6.0",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.black]
+[tool.hatch.build.targets.wheel]
+packages = ["src/gateway"]
+
+[tool.ruff]
 line-length = 100
-target-version = ['py310']
-include = '\.pyi?$'
+target-version = "py312"
+src = ["src", "tests"]
 
-[tool.isort]
-profile = "black"
-line_length = 100
-multi_line_output = 3
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # unused imports in __init__.py
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

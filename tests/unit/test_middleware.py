@@ -4,17 +4,13 @@ import time
 
 import pytest
 from aiohttp import web
-from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
+from aiohttp.test_utils import AioHTTPTestCase
 
-from gateway.core.config import GatewayConfig, LoggingConfig
+from gateway.core.config import GatewayConfig
 from gateway.core.middleware import (
-    ErrorHandlingMiddleware,
     Middleware,
     MiddlewareChain,
     RequestContext,
-    RequestLoggingMiddleware,
-    ResponseLoggingMiddleware,
-    create_request_context,
 )
 
 
@@ -100,30 +96,14 @@ class TestMiddlewareChain:
 
         chain = MiddlewareChain([middleware1, middleware2, middleware3])
 
-        # Create a mock request
-        app = web.Application()
-        request = web.Request(
-            message=None,
-            payload=None,
-            protocol=None,
-            payload_writer=None,
-            task=None,
-            loop=None,
-        )
-        request._app = app
+        # Verify chain was created with the correct middlewares
+        assert len(chain.middlewares) == 3
+        assert chain.middlewares[0] == middleware1
+        assert chain.middlewares[1] == middleware2
+        assert chain.middlewares[2] == middleware3
 
-        context = RequestContext(
-            method="GET",
-            path="/test",
-            query_params={},
-            headers={},
-            client_ip="127.0.0.1",
-            user_agent="test",
-            correlation_id="test-123",
-        )
-
-        # Note: This test is simplified and won't actually work with real aiohttp
-        # In practice, we'd need proper integration tests with a running server
+        # Note: Testing actual execution requires proper aiohttp test setup
+        # which is covered in integration tests
 
     @pytest.mark.asyncio
     async def test_middleware_short_circuit(self):
@@ -133,7 +113,7 @@ class TestMiddlewareChain:
         middleware2 = ShortCircuitMiddleware(config)
         middleware3 = DummyMiddleware(config, "third")
 
-        chain = MiddlewareChain([middleware1, middleware2, middleware3])
+        MiddlewareChain([middleware1, middleware2, middleware3])
 
         # Create mock request and context
         # Similar to above, this is simplified
@@ -184,7 +164,6 @@ class TestMiddlewareIntegration(AioHTTPTestCase):
 
         return app
 
-    @unittest_run_loop
     async def test_request_context_creation(self):
         """Test creating request context from real request."""
         async with self.client.get("/test") as resp:

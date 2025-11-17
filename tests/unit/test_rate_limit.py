@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 
@@ -12,7 +12,6 @@ from gateway.core.rate_limit import (
     FixedWindowAlgorithm,
     InMemoryRateLimitStore,
     RateLimitState,
-    RedisRateLimitStore,
     SlidingWindowAlgorithm,
     TokenBucketAlgorithm,
 )
@@ -94,7 +93,7 @@ class TestTokenBucketAlgorithm:
         burst = 5
         for i in range(burst):
             state = await algorithm.check_limit(key="test", limit=10, window=60, burst=burst)
-            assert state.allowed is True, f"Request {i+1} should be allowed"
+            assert state.allowed is True, f"Request {i + 1} should be allowed"
 
         # Next request should be denied (bucket empty)
         state = await algorithm.check_limit(key="test", limit=10, window=60, burst=burst)
@@ -132,7 +131,7 @@ class TestFixedWindowAlgorithm:
         # Make requests within limit
         for i in range(5):
             state = await algorithm.check_limit(key="test", limit=10, window=60)
-            assert state.allowed is True, f"Request {i+1} should be allowed"
+            assert state.allowed is True, f"Request {i + 1} should be allowed"
             assert state.remaining == 10 - (i + 1)
 
     @pytest.mark.asyncio
@@ -189,7 +188,7 @@ class TestSlidingWindowAlgorithm:
         # Make requests within limit
         for i in range(5):
             state = await algorithm.check_limit(key="test", limit=10, window=60)
-            assert state.allowed is True, f"Request {i+1} should be allowed"
+            assert state.allowed is True, f"Request {i + 1} should be allowed"
 
     @pytest.mark.asyncio
     async def test_denies_requests_exceeding_limit(self, in_memory_store):

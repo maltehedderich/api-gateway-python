@@ -11,11 +11,8 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
 
 import redis.asyncio as redis
-
-from gateway.core.config import RateLimitRule
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +33,7 @@ class RateLimitState:
     remaining: int
     limit: int
     reset_at: int
-    retry_after: Optional[int] = None
+    retry_after: int | None = None
 
 
 class RateLimitAlgorithm(ABC):
@@ -48,7 +45,7 @@ class RateLimitAlgorithm(ABC):
         key: str,
         limit: int,
         window: int,
-        burst: Optional[int] = None,
+        burst: int | None = None,
     ) -> RateLimitState:
         """Check if request is within rate limit.
 
@@ -84,7 +81,7 @@ class TokenBucketAlgorithm(RateLimitAlgorithm):
         key: str,
         limit: int,
         window: int,
-        burst: Optional[int] = None,
+        burst: int | None = None,
     ) -> RateLimitState:
         """Check rate limit using token bucket algorithm.
 
@@ -105,9 +102,11 @@ class TokenBucketAlgorithm(RateLimitAlgorithm):
         # Get current bucket state
         bucket_state = await self.store.get_bucket_state(key)
 
+        tokens: float
+        last_refill: float
         if bucket_state is None:
             # First request - initialize bucket
-            tokens = bucket_capacity - 1  # Consume one token
+            tokens = float(bucket_capacity - 1)  # Consume one token
             last_refill = now
         else:
             tokens, last_refill = bucket_state
@@ -115,7 +114,7 @@ class TokenBucketAlgorithm(RateLimitAlgorithm):
             # Calculate tokens to add based on time elapsed
             time_elapsed = now - last_refill
             tokens_to_add = time_elapsed * refill_rate
-            tokens = min(bucket_capacity, tokens + tokens_to_add)
+            tokens = min(float(bucket_capacity), tokens + tokens_to_add)
 
             # Try to consume a token
             if tokens >= 1:
@@ -169,7 +168,7 @@ class FixedWindowAlgorithm(RateLimitAlgorithm):
         key: str,
         limit: int,
         window: int,
-        burst: Optional[int] = None,
+        burst: int | None = None,
     ) -> RateLimitState:
         """Check rate limit using fixed window algorithm.
 
@@ -238,7 +237,7 @@ class SlidingWindowAlgorithm(RateLimitAlgorithm):
         key: str,
         limit: int,
         window: int,
-        burst: Optional[int] = None,
+        burst: int | None = None,
     ) -> RateLimitState:
         """Check rate limit using sliding window algorithm.
 
@@ -306,7 +305,26 @@ class RateLimitStore(ABC):
     """Abstract base class for rate limiting state storage."""
 
     @abstractmethod
-    async def get_bucket_state(self, key: str) -> Optional[tuple[float, float]]:
+    async def connect(self) -> None:
+        """Connect to the rate limit store."""
+        pass
+
+    @abstractmethod
+    async def disconnect(self) -> None:
+        """Disconnect from the rate limit store."""
+        pass
+
+    @abstractmethod
+    async def is_healthy(self) -> bool:
+        """Check if the store is healthy and operational.
+
+        Returns:
+            True if healthy, False otherwise
+        """
+        pass
+
+    @abstractmethod
+    async def get_bucket_state(self, key: str) -> tuple[float, float] | None:
         """Get token bucket state.
 
         Args:
@@ -318,9 +336,7 @@ class RateLimitStore(ABC):
         pass
 
     @abstractmethod
-    async def set_bucket_state(
-        self, key: str, tokens: float, last_refill: float, ttl: int
-    ) -> None:
+    async def set_bucket_state(self, key: str, tokens: float, last_refill: float, ttl: int) -> None:
         """Set token bucket state.
 
         Args:
@@ -373,7 +389,7 @@ class RedisRateLimitStore(RateLimitStore):
         """
         self.redis_url = redis_url
         self.key_prefix = key_prefix
-        self.client: Optional[redis.Redis] = None
+        self.client: redis.Redis | None = None
 
     async def connect(self) -> None:
         """Connect to Redis."""
@@ -400,7 +416,9 @@ class RedisRateLimitStore(RateLimitStore):
             return False
 
         try:
-            await self.client.ping()
+            ping_result = self.client.ping()
+            if hasattr(ping_result, "__await__"):
+                await ping_result
             return True
         except Exception:
             return False
@@ -439,7 +457,7 @@ class RedisRateLimitStore(RateLimitStore):
         """
         return f"{self._make_key(key)}:window:{window_start}"
 
-    async def get_bucket_state(self, key: str) -> Optional[tuple[float, float]]:
+    async def get_bucket_state(self, key: str) -> tuple[float, float] | None:
         """Get token bucket state from Redis.
 
         Args:
@@ -453,7 +471,11 @@ class RedisRateLimitStore(RateLimitStore):
 
         try:
             bucket_key = self._bucket_key(key)
-            data = await self.client.hgetall(bucket_key)
+            hgetall_result = self.client.hgetall(bucket_key)
+            if hasattr(hgetall_result, "__await__"):
+                data = await hgetall_result
+            else:
+                data = hgetall_result
 
             if not data:
                 return None
@@ -467,9 +489,7 @@ class RedisRateLimitStore(RateLimitStore):
             logger.error(f"Failed to get bucket state for {key}: {e}")
             return None
 
-    async def set_bucket_state(
-        self, key: str, tokens: float, last_refill: float, ttl: int
-    ) -> None:
+    async def set_bucket_state(self, key: str, tokens: float, last_refill: float, ttl: int) -> None:
         """Set token bucket state in Redis.
 
         Args:
@@ -486,14 +506,18 @@ class RedisRateLimitStore(RateLimitStore):
 
             # Use pipeline for atomic operation
             async with self.client.pipeline(transaction=True) as pipe:
-                await pipe.hset(
+                hset_result = pipe.hset(
                     bucket_key,
                     mapping={
                         "tokens": str(tokens),
                         "last_refill": str(last_refill),
                     },
                 )
-                await pipe.expire(bucket_key, ttl * 2)  # TTL = 2x window for safety
+                if hasattr(hset_result, "__await__"):
+                    await hset_result
+                expire_result = pipe.expire(bucket_key, ttl * 2)  # TTL = 2x window for safety
+                if hasattr(expire_result, "__await__"):
+                    await expire_result
                 await pipe.execute()
 
         except Exception as e:
@@ -515,7 +539,11 @@ class RedisRateLimitStore(RateLimitStore):
 
         try:
             window_key = self._window_key(key, window_start)
-            count = await self.client.get(window_key)
+            get_result = self.client.get(window_key)
+            if hasattr(get_result, "__await__"):
+                count = await get_result
+            else:
+                count = get_result
 
             return int(count) if count else 0
 
@@ -544,8 +572,12 @@ class RedisRateLimitStore(RateLimitStore):
 
             # Use pipeline for atomic increment and expiration
             async with self.client.pipeline(transaction=True) as pipe:
-                await pipe.incr(window_key)
-                await pipe.expire(window_key, window_duration * 2)  # TTL = 2x window
+                incr_result = pipe.incr(window_key)
+                if hasattr(incr_result, "__await__"):
+                    await incr_result
+                expire_result = pipe.expire(window_key, window_duration * 2)  # TTL = 2x window
+                if hasattr(expire_result, "__await__"):
+                    await expire_result
                 results = await pipe.execute()
 
             return int(results[0])
@@ -580,7 +612,7 @@ class InMemoryRateLimitStore(RateLimitStore):
         """
         return True
 
-    async def get_bucket_state(self, key: str) -> Optional[tuple[float, float]]:
+    async def get_bucket_state(self, key: str) -> tuple[float, float] | None:
         """Get token bucket state.
 
         Args:
@@ -591,9 +623,7 @@ class InMemoryRateLimitStore(RateLimitStore):
         """
         return self.buckets.get(key)
 
-    async def set_bucket_state(
-        self, key: str, tokens: float, last_refill: float, ttl: int
-    ) -> None:
+    async def set_bucket_state(self, key: str, tokens: float, last_refill: float, ttl: int) -> None:
         """Set token bucket state.
 
         Args:

@@ -9,8 +9,6 @@ This module implements the HTTP server foundation including:
 
 import logging
 import ssl
-from pathlib import Path
-from typing import Optional
 
 from aiohttp import web
 
@@ -19,6 +17,14 @@ from gateway.core.logging import GatewayLogger
 from gateway.core.metrics import GatewayMetrics
 
 logger = logging.getLogger(__name__)
+
+# App keys for type-safe access (exported for use in middleware)
+CONFIG_KEY = web.AppKey("config", GatewayConfig)
+LOGGER_KEY = web.AppKey("logger", GatewayLogger)
+METRICS_KEY = web.AppKey("metrics", GatewayMetrics)
+
+# Export keys
+__all__ = ["HTTPServer", "CONFIG_KEY", "LOGGER_KEY", "METRICS_KEY"]
 
 
 class HTTPServer:
@@ -47,9 +53,9 @@ class HTTPServer:
         self.config = config
         self.structured_logger = structured_logger
         self.metrics = metrics
-        self.app: Optional[web.Application] = None
-        self._runner: Optional[web.AppRunner] = None
-        self._site: Optional[web.TCPSite] = None
+        self.app: web.Application | None = None
+        self._runner: web.AppRunner | None = None
+        self._site: web.TCPSite | None = None
 
     def create_app(self) -> web.Application:
         """Create and configure the aiohttp application.
@@ -65,9 +71,9 @@ class HTTPServer:
         )
 
         # Store references for access in handlers
-        app["config"] = self.config
-        app["logger"] = self.structured_logger
-        app["metrics"] = self.metrics
+        app[CONFIG_KEY] = self.config
+        app[LOGGER_KEY] = self.structured_logger
+        app[METRICS_KEY] = self.metrics
 
         # Setup lifecycle hooks
         app.on_startup.append(self._on_startup)
@@ -77,7 +83,7 @@ class HTTPServer:
         self.app = app
         return app
 
-    def _create_ssl_context(self) -> Optional[ssl.SSLContext]:
+    def _create_ssl_context(self) -> ssl.SSLContext | None:
         """Create SSL context for TLS support.
 
         Returns:
@@ -121,6 +127,10 @@ class HTTPServer:
 
         if self.app is None:
             self.create_app()
+
+        # Ensure app is not None
+        if self.app is None:
+            raise RuntimeError("Failed to create application")
 
         # Create SSL context if TLS is enabled
         ssl_context = self._create_ssl_context()

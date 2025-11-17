@@ -1,7 +1,5 @@
 """Unit tests for the routing engine."""
 
-import pytest
-
 from gateway.core.config import RouteConfig
 from gateway.core.routing import PathMatcher, Router
 

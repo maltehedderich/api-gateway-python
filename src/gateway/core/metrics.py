@@ -4,8 +4,9 @@ Provides metrics collection, health checks, and integration with monitoring syst
 """
 
 import time
+from collections.abc import Callable
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from prometheus_client import (
     REGISTRY,
@@ -33,8 +34,8 @@ class ComponentHealth:
         self,
         name: str,
         status: HealthStatus,
-        message: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        message: str | None = None,
+        details: dict[str, Any] | None = None,
     ):
         """Initialize component health status.
 
@@ -49,13 +50,13 @@ class ComponentHealth:
         self.message = message
         self.details = details or {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation.
 
         Returns:
             Dictionary representation of the health status
         """
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "name": self.name,
             "status": self.status.value,
         }
@@ -76,7 +77,7 @@ class GatewayMetrics:
             config: Metrics configuration
         """
         self.config = config
-        self._health_checks: Dict[str, Callable[[], ComponentHealth]] = {}
+        self._health_checks: dict[str, Callable[[], ComponentHealth]] = {}
 
         # Request metrics
         self.request_total = Counter(
@@ -176,8 +177,8 @@ class GatewayMetrics:
         path: str,
         status_code: int,
         duration_seconds: float,
-        request_size: Optional[int] = None,
-        response_size: Optional[int] = None,
+        request_size: int | None = None,
+        response_size: int | None = None,
     ) -> None:
         """Record a completed HTTP request.
 
@@ -196,9 +197,7 @@ class GatewayMetrics:
             method=method, path=normalized_path, status=str(status_code)
         ).inc()
 
-        self.request_duration.labels(method=method, path=normalized_path).observe(
-            duration_seconds
-        )
+        self.request_duration.labels(method=method, path=normalized_path).observe(duration_seconds)
 
         if request_size is not None:
             self.request_size.labels(method=method, path=normalized_path).observe(request_size)
@@ -206,7 +205,7 @@ class GatewayMetrics:
         if response_size is not None:
             self.response_size.labels(method=method, path=normalized_path).observe(response_size)
 
-    def record_auth_attempt(self, success: bool, reason: Optional[str] = None) -> None:
+    def record_auth_attempt(self, success: bool, reason: str | None = None) -> None:
         """Record an authentication attempt.
 
         Args:
@@ -249,7 +248,7 @@ class GatewayMetrics:
         upstream: str,
         status_code: int,
         duration_seconds: float,
-        error_type: Optional[str] = None,
+        error_type: str | None = None,
     ) -> None:
         """Record an upstream request.
 
@@ -283,9 +282,7 @@ class GatewayMetrics:
         """Decrement active connection count."""
         self.active_connections.dec()
 
-    def register_health_check(
-        self, name: str, check_func: Callable[[], ComponentHealth]
-    ) -> None:
+    def register_health_check(self, name: str, check_func: Callable[[], ComponentHealth]) -> None:
         """Register a health check function.
 
         Args:
@@ -294,7 +291,7 @@ class GatewayMetrics:
         """
         self._health_checks[name] = check_func
 
-    def check_health(self, detailed: bool = False) -> Dict[str, Any]:
+    def check_health(self, detailed: bool = False) -> dict[str, Any]:
         """Check health of all registered components.
 
         Args:
@@ -309,18 +306,21 @@ class GatewayMetrics:
                 "message": "No health checks registered",
             }
 
-        component_results: List[ComponentHealth] = []
+        component_results: list[ComponentHealth] = []
         overall_status = HealthStatus.HEALTHY
 
         for name, check_func in self._health_checks.items():
             try:
-                result = check_func()
-                component_results.append(result)
+                health_result = check_func()
+                component_results.append(health_result)
 
                 # Determine overall status
-                if result.status == HealthStatus.UNHEALTHY:
+                if health_result.status == HealthStatus.UNHEALTHY:
                     overall_status = HealthStatus.UNHEALTHY
-                elif result.status == HealthStatus.DEGRADED and overall_status == HealthStatus.HEALTHY:
+                elif (
+                    health_result.status == HealthStatus.DEGRADED
+                    and overall_status == HealthStatus.HEALTHY
+                ):
                     overall_status = HealthStatus.DEGRADED
 
             except Exception as e:
@@ -334,17 +334,17 @@ class GatewayMetrics:
                 )
                 overall_status = HealthStatus.UNHEALTHY
 
-        result: Dict[str, Any] = {
+        response: dict[str, Any] = {
             "status": overall_status.value,
             "timestamp": time.time(),
         }
 
         if detailed:
-            result["components"] = [c.to_dict() for c in component_results]
+            response["components"] = [c.to_dict() for c in component_results]
 
-        return result
+        return response
 
-    def check_liveness(self) -> Dict[str, Any]:
+    def check_liveness(self) -> dict[str, Any]:
         """Check if the service is alive (simple check).
 
         Returns:
@@ -355,7 +355,7 @@ class GatewayMetrics:
             "timestamp": time.time(),
         }
 
-    def check_readiness(self) -> Dict[str, Any]:
+    def check_readiness(self) -> dict[str, Any]:
         """Check if the service is ready to accept traffic.
 
         Returns:
@@ -406,7 +406,7 @@ class GatewayMetrics:
 
 
 # Global metrics instance (will be initialized by the application)
-_gateway_metrics: Optional[GatewayMetrics] = None
+_gateway_metrics: GatewayMetrics | None = None
 
 
 def initialize_metrics(config: MetricsConfig) -> GatewayMetrics:

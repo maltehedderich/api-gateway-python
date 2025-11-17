@@ -7,8 +7,8 @@ import json
 import logging
 import sys
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from gateway.core.config import LoggingConfig
 
@@ -19,7 +19,7 @@ class CorrelationIdFilter(logging.Filter):
     def __init__(self) -> None:
         """Initialize the correlation ID filter."""
         super().__init__()
-        self._correlation_id: Optional[str] = None
+        self._correlation_id: str | None = None
 
     def set_correlation_id(self, correlation_id: str) -> None:
         """Set the correlation ID for the current request.
@@ -49,7 +49,7 @@ class CorrelationIdFilter(logging.Filter):
 class JsonFormatter(logging.Formatter):
     """Custom JSON formatter for structured logging."""
 
-    def __init__(self, redact_patterns: Optional[List[str]] = None):
+    def __init__(self, redact_patterns: list[str] | None = None):
         """Initialize the JSON formatter.
 
         Args:
@@ -67,8 +67,8 @@ class JsonFormatter(logging.Formatter):
         Returns:
             JSON-formatted log string
         """
-        log_data: Dict[str, Any] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+        log_data: dict[str, Any] = {
+            "timestamp": datetime.now(UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -81,7 +81,7 @@ class JsonFormatter(logging.Formatter):
 
         # Add extra fields from the record
         if hasattr(record, "extra_fields"):
-            extra = getattr(record, "extra_fields")
+            extra = record.extra_fields
             if isinstance(extra, dict):
                 log_data.update(self._redact_sensitive_data(extra))
 
@@ -116,7 +116,7 @@ class JsonFormatter(logging.Formatter):
 
         return json.dumps(log_data, default=str)
 
-    def _redact_sensitive_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _redact_sensitive_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """Redact sensitive data from log fields.
 
         Args:
@@ -125,7 +125,7 @@ class JsonFormatter(logging.Formatter):
         Returns:
             Dictionary with sensitive fields redacted
         """
-        redacted = {}
+        redacted: dict[str, Any] = {}
         for key, value in data.items():
             if any(pattern.lower() in key.lower() for pattern in self.redact_patterns):
                 redacted[key] = "***REDACTED***"
@@ -148,7 +148,7 @@ class TextFormatter(logging.Formatter):
         Returns:
             Formatted log string
         """
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         correlation_id = getattr(record, "correlation_id", "none")
 
         base = (
@@ -184,6 +184,7 @@ class GatewayLogger:
         logger.handlers.clear()
 
         # Create handler based on output configuration
+        handler: logging.Handler
         if self.config.output == "stdout":
             handler = logging.StreamHandler(sys.stdout)
         elif self.config.output == "stderr":
@@ -193,6 +194,7 @@ class GatewayLogger:
             handler = logging.FileHandler(self.config.output)
 
         # Set formatter based on format configuration
+        formatter: logging.Formatter
         if self.config.format.lower() == "json":
             formatter = JsonFormatter(redact_patterns=self.config.redact_headers)
         else:
@@ -205,7 +207,7 @@ class GatewayLogger:
         # Prevent propagation to root logger
         logger.propagate = False
 
-    def set_correlation_id(self, correlation_id: Optional[str] = None) -> str:
+    def set_correlation_id(self, correlation_id: str | None = None) -> str:
         """Set or generate a correlation ID for the current request.
 
         Args:
@@ -248,8 +250,8 @@ class GatewayLogger:
         method: str,
         path: str,
         client_ip: str,
-        user_agent: Optional[str] = None,
-        user_id: Optional[str] = None,
+        user_agent: str | None = None,
+        user_id: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Log an incoming request.
@@ -289,8 +291,8 @@ class GatewayLogger:
         path: str,
         status_code: int,
         latency_ms: float,
-        response_size: Optional[int] = None,
-        user_id: Optional[str] = None,
+        response_size: int | None = None,
+        user_id: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Log a response.
@@ -336,9 +338,9 @@ class GatewayLogger:
     def log_auth_event(
         self,
         event: str,
-        user_id: Optional[str] = None,
+        user_id: str | None = None,
         success: bool = True,
-        reason: Optional[str] = None,
+        reason: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Log an authentication or authorization event.
@@ -351,13 +353,14 @@ class GatewayLogger:
             **kwargs: Additional fields to log
         """
         logger = self.get_logger()
-        extra_fields = {
-            "event_type": event,
-            "auth": {"user_id": user_id, "success": success},
-        }
+        auth_data: dict[str, Any] = {"user_id": user_id, "success": success}
         if reason:
-            extra_fields["auth"]["reason"] = reason
+            auth_data["reason"] = reason
 
+        extra_fields: dict[str, Any] = {
+            "event_type": event,
+            "auth": auth_data,
+        }
         extra_fields.update(kwargs)
 
         log_level = logging.INFO if success else logging.WARNING
@@ -405,9 +408,9 @@ class GatewayLogger:
         self,
         upstream_url: str,
         method: str,
-        status_code: Optional[int] = None,
-        latency_ms: Optional[float] = None,
-        error: Optional[str] = None,
+        status_code: int | None = None,
+        latency_ms: float | None = None,
+        error: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Log an upstream service interaction.
@@ -421,18 +424,19 @@ class GatewayLogger:
             **kwargs: Additional fields to log
         """
         logger = self.get_logger()
-        extra_fields = {
-            "event_type": "upstream_request",
-            "upstream": {
-                "url": upstream_url,
-                "method": method,
-                "status_code": status_code,
-                "latency_ms": latency_ms,
-            },
+        upstream_data: dict[str, Any] = {
+            "url": upstream_url,
+            "method": method,
+            "status_code": status_code,
+            "latency_ms": latency_ms,
         }
         if error:
-            extra_fields["upstream"]["error"] = error
+            upstream_data["error"] = error
 
+        extra_fields: dict[str, Any] = {
+            "event_type": "upstream_request",
+            "upstream": upstream_data,
+        }
         extra_fields.update(kwargs)
 
         log_level = logging.ERROR if error else logging.DEBUG
@@ -446,7 +450,7 @@ class GatewayLogger:
 
 
 # Global logger instance (will be initialized by the application)
-_gateway_logger: Optional[GatewayLogger] = None
+_gateway_logger: GatewayLogger | None = None
 
 
 def initialize_logging(config: LoggingConfig) -> GatewayLogger:

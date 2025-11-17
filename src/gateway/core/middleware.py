@@ -11,13 +11,15 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 from aiohttp import web
 
 from gateway.core.config import GatewayConfig
 from gateway.core.routing import RouteMatch
+from gateway.core.server import CONFIG_KEY, LOGGER_KEY, METRICS_KEY
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +40,8 @@ class RequestContext:
     # HTTP Request Data
     method: str
     path: str
-    query_params: Dict[str, str]
-    headers: Dict[str, str]
+    query_params: dict[str, str]
+    headers: dict[str, str]
     client_ip: str
     user_agent: str
 
@@ -48,22 +50,22 @@ class RequestContext:
     start_time: float = field(default_factory=time.time)
 
     # Route Information
-    route_match: Optional[RouteMatch] = None
+    route_match: RouteMatch | None = None
 
     # Authentication/Authorization Context (populated by auth middleware)
-    user_id: Optional[str] = None
-    session_id: Optional[str] = None
-    roles: List[str] = field(default_factory=list)
-    permissions: List[str] = field(default_factory=list)
+    user_id: str | None = None
+    session_id: str | None = None
+    roles: list[str] = field(default_factory=list)
+    permissions: list[str] = field(default_factory=list)
     authenticated: bool = False
 
     # Rate Limiting Context (populated by rate limiting middleware)
-    rate_limit_key: Optional[str] = None
-    rate_limit_remaining: Optional[int] = None
-    rate_limit_reset: Optional[int] = None
+    rate_limit_key: str | None = None
+    rate_limit_remaining: int | None = None
+    rate_limit_reset: int | None = None
 
     # Custom attributes for middleware to attach data
-    attributes: Dict[str, Any] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
 
     def elapsed_ms(self) -> float:
         """Calculate elapsed time since request start in milliseconds.
@@ -75,7 +77,7 @@ class RequestContext:
 
 
 # Type alias for middleware handler functions
-MiddlewareHandler = Callable[[web.Request, RequestContext], Any]
+MiddlewareHandler = Callable[[web.Request, RequestContext], Awaitable[web.Response]]
 
 
 class Middleware(ABC):
@@ -128,7 +130,7 @@ class MiddlewareChain:
     to call the next handler or short-circuit the chain by returning a response.
     """
 
-    def __init__(self, middlewares: List[Middleware]):
+    def __init__(self, middlewares: list[Middleware]):
         """Initialize the middleware chain.
 
         Args:
@@ -150,6 +152,7 @@ class MiddlewareChain:
         Returns:
             web.Response object
         """
+
         # Build the chain from the end
         async def build_handler(index: int) -> MiddlewareHandler:
             """Build handler at given index.
@@ -165,7 +168,10 @@ class MiddlewareChain:
                 async def end_handler(req: web.Request, ctx: RequestContext) -> web.Response:
                     return web.Response(
                         status=500,
-                        text='{"error": "internal_error", "message": "End of middleware chain reached without response"}',
+                        text=(
+                            '{"error": "internal_error", '
+                            '"message": "End of middleware chain reached without response"}'
+                        ),
                         content_type="application/json",
                     )
 
@@ -216,11 +222,11 @@ class RequestLoggingMiddleware(Middleware):
             web.Response object
         """
         # Get structured logger from app
-        structured_logger = request.app.get("logger")
+        structured_logger = request.app.get(LOGGER_KEY)
 
         # Log request start
         if structured_logger:
-            await structured_logger.log_request(
+            structured_logger.log_request(
                 correlation_id=context.correlation_id,
                 method=context.method,
                 path=context.path,
@@ -257,36 +263,41 @@ class ResponseLoggingMiddleware(Middleware):
         response = await next_handler(request, context)
 
         # Get structured logger from app
-        structured_logger = request.app.get("logger")
+        structured_logger = request.app.get(LOGGER_KEY)
 
         # Log response with full context per design spec section 9.6 Task 28
         if structured_logger:
-            log_params = {
+            # Prepare extra fields for logging
+            extra_fields: dict[str, Any] = {
                 "correlation_id": context.correlation_id,
-                "status_code": response.status,
-                "latency_ms": context.elapsed_ms(),
-                "user_id": context.user_id,
                 "route_id": context.route_match.route.id if context.route_match else None,
             }
 
             # Add rate limiting context if available
             if context.rate_limit_key:
-                log_params["ratelimit"] = {
+                extra_fields["ratelimit"] = {
                     "key": context.rate_limit_key,
                     "remaining": context.rate_limit_remaining,
                     "reset_at": context.rate_limit_reset,
                 }
 
-            await structured_logger.log_response(**log_params)
+            structured_logger.log_response(
+                method=context.method,
+                path=context.path,
+                status_code=response.status,
+                latency_ms=context.elapsed_ms(),
+                user_id=context.user_id,
+                **extra_fields,
+            )
 
         # Update metrics
-        metrics = request.app.get("metrics")
+        metrics = request.app.get(METRICS_KEY)
         if metrics:
             metrics.record_request(
                 method=context.method,
                 path=context.path,
                 status_code=response.status,
-                latency_ms=context.elapsed_ms(),
+                duration_seconds=context.elapsed_ms() / 1000.0,
             )
 
         return response
@@ -328,19 +339,22 @@ class ErrorHandlingMiddleware(Middleware):
             )
 
             # Return 500 error response with timestamp per design spec section 6.1
-            from datetime import datetime
+            from datetime import UTC, datetime
+
             return web.json_response(
                 {
                     "error": "internal_error",
                     "message": "An unexpected error occurred",
                     "correlation_id": context.correlation_id,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                 },
                 status=500,
             )
 
 
-def create_request_context(request: web.Request, correlation_id: Optional[str] = None) -> RequestContext:
+def create_request_context(
+    request: web.Request, correlation_id: str | None = None
+) -> RequestContext:
     """Create a request context from an aiohttp request.
 
     Args:
@@ -353,7 +367,7 @@ def create_request_context(request: web.Request, correlation_id: Optional[str] =
     # Generate correlation ID if not provided
     if not correlation_id:
         # Check if client provided correlation ID
-        config = request.app.get("config")
+        config = request.app.get(CONFIG_KEY)
         if config:
             header_name = config.logging.correlation_id_header
             correlation_id = request.headers.get(header_name)
