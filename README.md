@@ -1,5 +1,9 @@
 # API Gateway
 
+> [!WARNING] > **EXPERIMENTAL CODE - NOT PRODUCTION READY**
+>
+> All code in this repository was generated as an experiment with Claude Code Web and **MUST BE CAREFULLY REVIEWED** before any use in production environments. This is a proof-of-concept and has not undergone the necessary security audits, testing, and validation required for production deployment.
+
 A Python-based API Gateway that serves as a unified entry point for backend services. The gateway provides essential cross-cutting concerns including:
 
 - Request/response logging with structured JSON format
@@ -49,16 +53,19 @@ api-gateway-python/
 ### Installation
 
 1. Install Poetry if you haven't already:
+
 ```bash
 curl -sSL https://install.python-poetry.org | python3 -
 ```
 
 2. Install dependencies:
+
 ```bash
 poetry install
 ```
 
 3. Activate the virtual environment:
+
 ```bash
 poetry shell
 ```
@@ -73,6 +80,7 @@ The project uses several tools to maintain code quality:
 - **mypy**: Type checking
 
 Run all checks:
+
 ```bash
 # Format code
 poetry run black src tests
@@ -100,6 +108,7 @@ poetry run pytest --cov=src --cov-report=html
 ## Configuration
 
 Configuration is loaded from:
+
 1. Configuration files (YAML/JSON) in the `config/` directory
 2. Environment variables (override file-based config)
 3. Command-line arguments (for specific overrides)
