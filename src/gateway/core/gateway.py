@@ -82,8 +82,9 @@ class Gateway:
         elif self.config.session.session_store_url.startswith("dynamodb://"):
             # DynamoDB session store for AWS Lambda
             logger.info("Using DynamoDB session store")
-            from gateway.core.dynamodb_store import DynamoDBSessionStore
             import os
+
+            from gateway.core.dynamodb_store import DynamoDBSessionStore
 
             # Extract table name from URL: dynamodb://table-name
             table_name = self.config.session.session_store_url.replace("dynamodb://", "")
@@ -113,8 +114,9 @@ class Gateway:
         elif self.config.rate_limiting.store_url.startswith("dynamodb://"):
             # DynamoDB rate limit store for AWS Lambda
             logger.info("Using DynamoDB rate limit store")
-            from gateway.core.dynamodb_store import DynamoDBRateLimitStore
             import os
+
+            from gateway.core.dynamodb_store import DynamoDBRateLimitStore
 
             # Extract table name from URL: dynamodb://table-name
             table_name = self.config.rate_limiting.store_url.replace("dynamodb://", "")

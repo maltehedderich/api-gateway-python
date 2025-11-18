@@ -225,9 +225,6 @@ def _get_or_create_handler() -> Mangum:
         if _gateway is None:
             _gateway = asyncio.run(_init_gateway())
 
-        # Create aiohttp app
-        from aiohttp import web
-
         app = _gateway.server.create_app()
         _gateway._setup_routes(app)
 
