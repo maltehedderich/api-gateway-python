@@ -1,6 +1,7 @@
 # API Gateway
 
-> [!WARNING] > **EXPERIMENTAL CODE - NOT PRODUCTION READY**
+> [!WARNING]
+> **EXPERIMENTAL CODE - NOT PRODUCTION READY**
 >
 > All code in this repository was generated as an experiment with Claude Code Web and **MUST BE CAREFULLY REVIEWED** before any use in production environments. This is a proof-of-concept and has not undergone the necessary security audits, testing, and validation required for production deployment.
 
